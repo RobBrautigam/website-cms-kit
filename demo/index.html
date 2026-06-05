@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website CMS Kit — live demo</title>
+<style>
+  :root{
+    --bg:#f8fafc; --white:#fff; --card:#f1f5f9; --text:#0f172a; --muted:#475569;
+    --accent:#2563eb; --accent-hover:#1d4ed8; --border:#e2e8f0;
+    --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:var(--font); color:var(--text); background:linear-gradient(to bottom,#fff,var(--card)); min-height:100vh; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px; margin:0 auto; padding:64px 24px 80px}
+  .head{display:flex; flex-direction:column; align-items:center; text-align:center; margin-bottom:48px}
+  .mark{color:var(--accent)}
+  .kicker{margin-top:16px; font-size:11px; font-weight:800; letter-spacing:.22em; text-transform:uppercase; color:rgba(71,85,105,.7)}
+  h1{margin:10px 0 0; font-size:34px; font-weight:900; letter-spacing:-.02em}
+  .lede{margin:12px 0 0; color:var(--muted); font-size:16px; max-width:38rem; line-height:1.6}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:24px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+  .card{display:block; text-decoration:none; color:inherit; background:var(--white); border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 32px -18px rgba(0,0,0,.18); transition:transform .15s ease, box-shadow .15s ease}
+  .card:hover{transform:translateY(-3px); box-shadow:0 1px 2px rgba(0,0,0,.04),0 22px 48px -20px rgba(0,0,0,.28)}
+  .shot{display:block; width:100%; height:auto; border-bottom:1px solid var(--border)}
+  .cap{padding:18px 20px}
+  .cap h2{margin:0; font-size:17px; font-weight:800}
+  .cap p{margin:6px 0 0; font-size:13px; color:var(--muted); line-height:1.5}
+  .go{display:inline-flex; align-items:center; gap:6px; margin-top:12px; font-size:13px; font-weight:700; color:var(--accent)}
+  .foot{margin-top:48px; text-align:center; font-size:13px; color:var(--muted)}
+  .foot a{color:var(--accent); text-decoration:none; font-weight:600}
+  .note{margin-top:8px; font-size:12px; color:rgba(71,85,105,.7)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <svg class="mark" width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" opacity="0.12"/>
+        <path d="M7 16 L12 7 L17 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="9.2" y1="13.2" x2="14.8" y2="13.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p class="kicker">Website CMS Kit · live demo</p>
+      <h1>The admin surface, white-labeled</h1>
+      <p class="lede">Two static, no-build mockups of what this kit's admin looks like. Placeholder brand "Acme". The real, working implementation is the <code>source/</code> tree.</p>
+    </div>
+
+    <div class="grid">
+      <a class="card" href="login.html">
+        <img class="shot" src="screenshots/login-desktop.png" alt="Admin login screen" />
+        <div class="cap">
+          <h2>Admin login</h2>
+          <p>Invite-only email + password over Supabase cookie sessions, with mandatory two-factor.</p>
+          <span class="go">Open the login →</span>
+        </div>
+      </a>
+      <a class="card" href="dashboard.html">
+        <img class="shot" src="screenshots/dashboard-desktop.png" alt="Admin dashboard with posts list" />
+        <div class="cap">
+          <h2>Admin dashboard</h2>
+          <p>Role-aware sidebar shell + the repeatable CMS list pattern: search, filters, status chips, row actions.</p>
+          <span class="go">Open the dashboard →</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="foot">
+      Source &amp; docs on <a href="https://github.com/RobBrautigam/website-cms-kit">GitHub</a>.
+      <p class="note">These pages are visual mockups — no data, no auth, no backend.</p>
+    </div>
+  </div>
+</body>
+</html>

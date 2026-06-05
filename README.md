@@ -6,7 +6,7 @@ It is the real backend of a production marketing site, extracted faithfully and 
 
 ## What it looks like
 
-White-labeled mockups (placeholder brand "Acme"), built from the kit's own neutral design tokens. Full visual tour + the standalone HTML in [`demo/`](demo/).
+White-labeled mockups (placeholder brand "Acme"), built from the kit's own neutral design tokens. **▶ Live demo: https://robbrautigam.github.io/website-cms-kit/demo/** · standalone HTML + full tour in [`demo/`](demo/).
 
 | Admin login | Admin dashboard (Posts) |
 |---|---|
