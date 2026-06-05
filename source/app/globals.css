@@ -1,0 +1,191 @@
+/*
+ * Website CMS Kit — design tokens + component classes (Tailwind v4).
+ *
+ * The admin components reference SEMANTIC token classes (bg-bg-card,
+ * text-text-primary, text-accent, border-border, btn-primary, ...) rather than
+ * raw colors. That is deliberate: swap the palette in ONE place (the :root block
+ * below) and the whole admin surface re-themes. This is the design-token pattern
+ * Linear/Stripe/Vercel use.
+ *
+ * The palette here is a NEUTRAL slate + blue. Replace the values in :root with
+ * your own brand tokens; leave the class names alone so the components keep
+ * working.
+ *
+ * In your own app, import Tailwind and this file from your root layout's CSS
+ * entrypoint (e.g. `@import "tailwindcss";` then this token layer).
+ */
+
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * 1. Raw token values (the ONE place to edit for re-theming).
+ * ------------------------------------------------------------------------- */
+:root {
+  /* Surfaces */
+  --bg-primary: #f8fafc;       /* page canvas */
+  --bg-white: #ffffff;          /* base white surface */
+  --bg-card: #f1f5f9;           /* cards, table headers, inputs */
+  --bg-card-hover: #e2e8f0;
+  --bg-elevated: #e2e8f0;       /* hover wells, code blocks */
+  --bg-surface-dim: #f1f5f9;
+  --bg-dark: #0f172a;           /* dark sections */
+  --bg-dark-card: #1e293b;
+  --bg-dark-elevated: #334155;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-on-dark: #f8fafc;
+  --text-on-dark-secondary: #cbd5e1;
+
+  /* Accent (single chromatic accent — swap to your brand color) */
+  --accent: #2563eb;
+  --accent-end: #1d4ed8;
+  --accent-warm: #2563eb;
+  --accent-deep: #1e40af;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --accent-glow: rgba(37, 99, 235, 0.35);
+
+  /* Borders */
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-dark: #334155;
+
+  /* Type */
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Elevation */
+  --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.12);
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Map raw tokens to Tailwind color/utility names so `bg-bg-card`,
+ *    `text-text-primary`, `text-accent`, `border-border`, etc. resolve.
+ * ------------------------------------------------------------------------- */
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-white: var(--bg-white);
+  --color-bg-card: var(--bg-card);
+  --color-bg-card-hover: var(--bg-card-hover);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-surface-dim: var(--bg-surface-dim);
+  --color-bg-dark: var(--bg-dark);
+  --color-bg-dark-card: var(--bg-dark-card);
+  --color-bg-dark-elevated: var(--bg-dark-elevated);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-on-dark-secondary: var(--text-on-dark-secondary);
+  --color-accent: var(--accent);
+  --color-accent-end: var(--accent-end);
+  --color-accent-warm: var(--accent-warm);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-glow: var(--accent-glow);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-border-dark: var(--border-dark);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Base
+ * ------------------------------------------------------------------------- */
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Component classes used by the admin surface.
+ * ------------------------------------------------------------------------- */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 15px;
+}
+@media (hover: hover) {
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+}
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  transition: all 0.2s ease;
+  font-size: 15px;
+}
+@media (hover: hover) {
+  .btn-outline:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.heading-display {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Rich-text editor + rendered article prose (TipTap).
+ * ------------------------------------------------------------------------- */
+.tiptap {
+  min-height: 360px;
+  padding: 20px;
+  outline: none;
+}
+.tiptap p { margin: 0 0 1rem; color: var(--text-primary); line-height: 1.7; }
+.tiptap h2 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; margin: 1.5rem 0 0.75rem; }
+.tiptap h3 { font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
+.tiptap ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+.tiptap ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+.tiptap blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; font-style: italic; color: var(--text-secondary); margin: 1rem 0; }
+.tiptap a { color: var(--accent); text-decoration: underline; }
+.tiptap img { border-radius: 8px; max-width: 100%; height: auto; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap-lede { font-weight: 500; }
