@@ -4,6 +4,16 @@ A complete, production-grade **admin / authentication / CMS backend** for a Next
 
 It is the real backend of a production marketing site, extracted faithfully and white-labeled. Not a library you `npm install` — a worked example you read, understand, and adapt. Everything here runs on just Next.js and Supabase: no third-party CMS, no separate backend service.
 
+## What it looks like
+
+White-labeled mockups (placeholder brand "Acme"), built from the kit's own neutral design tokens. Full visual tour + the standalone HTML in [`demo/`](demo/).
+
+| Admin login | Admin dashboard (Posts) |
+|---|---|
+| [![Admin login](demo/screenshots/login-desktop.png)](demo/login.html) | [![Admin dashboard](demo/screenshots/dashboard-desktop.png)](demo/dashboard.html) |
+
+Invite-only auth with two-factor, a sectioned admin shell with role-aware nav, and the repeatable CMS list pattern (search, filters, status chips, row actions). Every color comes from one re-themeable token layer ([`source/app/globals.css`](source/app/globals.css)).
+
 ## What you get
 
 - **Invite-only auth** — email + password over `@supabase/ssr` cookie sessions, mandatory TOTP two-factor with bcrypt-hashed recovery codes, password reset, and forced MFA enrollment after a grace window. No password is ever emailed.

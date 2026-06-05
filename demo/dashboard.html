@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Website CMS Kit — Admin dashboard (demo)</title>
+<style>
+  :root{
+    --bg-primary:#f8fafc; --bg-white:#ffffff; --bg-card:#f1f5f9; --bg-elevated:#e2e8f0;
+    --text-primary:#0f172a; --text-secondary:#475569; --text-muted:#94a3b8;
+    --accent:#2563eb; --accent-hover:#1d4ed8; --accent-soft:#dbeafe; --accent-glow:rgba(37,99,235,.35);
+    --border:#e2e8f0;
+    --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:var(--font); color:var(--text-primary); background:var(--bg-white); -webkit-font-smoothing:antialiased}
+  .app{display:flex; min-height:100vh}
+
+  /* Sidebar */
+  .sidebar{width:240px; flex-shrink:0; border-right:1px solid var(--border); background:var(--bg-card); display:flex; flex-direction:column}
+  .sb-logo{padding:20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px}
+  .sb-logo .mark{color:var(--accent)}
+  .sb-logo span{font-weight:900; font-size:14px; letter-spacing:-.02em}
+  nav{flex:1; padding:12px; overflow-y:auto}
+  .sec{margin-top:24px}
+  .sec:first-child{margin-top:0}
+  .sec-title{padding:4px 12px; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:rgba(71,85,105,.6); font-weight:600}
+  .navlink{display:flex; align-items:center; gap:12px; padding:10px 12px; margin-top:4px; border-radius:8px; font-size:14px; font-weight:500; color:var(--text-secondary); text-decoration:none; cursor:pointer}
+  .navlink:hover{color:var(--text-primary); background:rgba(255,255,255,.5)}
+  .navlink.active{background:rgba(37,99,235,.10); color:var(--accent)}
+  .navlink .ico{width:18px; text-align:center}
+  .sb-foot{padding:16px; border-top:1px solid var(--border)}
+  .who{padding:0 12px 12px; margin-bottom:8px; border-bottom:1px solid var(--border)}
+  .who .em{font-size:12px; font-weight:500; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .who .role{font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-top:2px; color:var(--accent); font-weight:700}
+  .sb-action{display:flex; align-items:center; gap:12px; width:100%; padding:8px 12px; border-radius:8px; font-size:12px; color:var(--text-secondary); background:none; border:0; cursor:pointer; text-align:left}
+  .sb-action:hover{color:var(--text-primary); background:rgba(37,99,235,.10)}
+  .sb-ver{padding:8px 12px 0; font-size:10px; color:rgba(71,85,105,.4)}
+
+  /* Main */
+  .main{flex:1; overflow-y:auto}
+  .inner{max-width:1100px; margin:0 auto; padding:32px 28px}
+  .pagehead{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:6px}
+  .pagehead h1{margin:0; font-size:28px; font-weight:900; letter-spacing:-.02em}
+  .pagehead p{margin:6px 0 0; color:var(--text-secondary); font-size:14px}
+  .btn{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; font-weight:700; font-size:14px; padding:11px 18px; border:0; border-radius:8px; cursor:pointer; white-space:nowrap}
+  .btn:hover{background:var(--accent-hover); box-shadow:0 0 24px var(--accent-glow)}
+
+  .filters{display:flex; flex-wrap:wrap; gap:12px; margin:24px 0 16px}
+  .search{position:relative; flex:1; min-width:220px}
+  .search svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted)}
+  .search input{width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border); background:var(--bg-card); border-radius:8px; font-size:14px; color:var(--text-primary); font-family:inherit}
+  select{padding:9px 12px; border:1px solid var(--border); background:var(--bg-card); border-radius:8px; font-size:14px; color:var(--text-primary); font-family:inherit; cursor:pointer}
+  input:focus,select:focus{outline:none; box-shadow:0 0 0 2px var(--accent)}
+
+  .tablewrap{border:1px solid var(--border); border-radius:12px; overflow:hidden}
+  table{width:100%; border-collapse:collapse}
+  thead tr{background:var(--bg-card); border-bottom:1px solid var(--border)}
+  th{text-align:left; font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.06em; padding:12px 20px}
+  th.r,td.r{text-align:right}
+  tbody tr{border-bottom:1px solid var(--border)}
+  tbody tr:last-child{border-bottom:0}
+  tbody tr:hover{background:rgba(241,245,249,.5)}
+  td{padding:16px 20px; vertical-align:middle}
+  .title{font-weight:600; color:var(--text-primary)}
+  .slug{font-size:12px; color:var(--text-secondary); margin-top:2px; font-family:var(--mono)}
+  .muted{font-size:14px; color:var(--text-secondary); white-space:nowrap}
+  .badge{display:inline-flex; align-items:center; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; text-transform:capitalize}
+  .b-pub{background:rgba(34,197,94,.10); color:#16a34a}
+  .b-draft{background:rgba(234,179,8,.12); color:#ca8a04}
+  .b-sched{background:rgba(59,130,246,.10); color:#2563eb}
+  .acts{display:flex; gap:8px; justify-content:flex-end; color:var(--text-secondary)}
+  .iconbtn{display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:1px solid var(--border); background:var(--bg-white); border-radius:7px; color:var(--text-secondary); cursor:pointer}
+  .iconbtn:hover{color:var(--accent); border-color:var(--accent)}
+  .iconbtn.del:hover{color:#ef4444; border-color:#ef4444}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <svg class="mark" width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" opacity="0.12"/>
+        <path d="M7 16 L12 7 L17 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="9.2" y1="13.2" x2="14.8" y2="13.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>Acme Admin</span>
+    </div>
+    <nav>
+      <div class="sec">
+        <p class="sec-title">Content</p>
+        <a class="navlink active"><span class="ico">📝</span><span>Posts</span></a>
+        <a class="navlink"><span class="ico">💼</span><span>Jobs</span></a>
+        <a class="navlink"><span class="ico">💬</span><span>Testimonials</span></a>
+      </div>
+      <div class="sec">
+        <p class="sec-title">Site</p>
+        <a class="navlink"><span class="ico">🔀</span><span>Redirects</span></a>
+        <a class="navlink"><span class="ico">🗺️</span><span>Sitemap</span></a>
+      </div>
+      <div class="sec">
+        <p class="sec-title">Organization</p>
+        <a class="navlink"><span class="ico">👥</span><span>Team</span></a>
+        <a class="navlink"><span class="ico">⚙️</span><span>Settings</span></a>
+      </div>
+      <div class="sec">
+        <p class="sec-title">Audit &amp; Compliance</p>
+        <a class="navlink"><span class="ico">📋</span><span>Audit Log</span></a>
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <div class="who">
+        <p class="em">ada@example.com</p>
+        <p class="role">Super Admin</p>
+      </div>
+      <button class="sb-action"><span class="ico">🔑</span>Change Password</button>
+      <button class="sb-action"><span class="ico">🚪</span>Sign Out</button>
+      <p class="sb-ver">v1.0.0</p>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="inner">
+      <div class="pagehead">
+        <div>
+          <h1>Posts</h1>
+          <p>Create, edit, schedule, and publish blog content.</p>
+        </div>
+        <button class="btn">+ New Post</button>
+      </div>
+
+      <div class="filters">
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" placeholder="Search posts…" />
+        </div>
+        <select><option>All statuses</option><option>Draft</option><option>Published</option><option>Scheduled</option></select>
+        <select><option>All categories</option><option>Product</option><option>Engineering</option><option>Company</option><option>Guides</option><option>News</option></select>
+      </div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th><th>Author</th><th>Status</th><th>Date</th><th class="r">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="title">Designing an invite-only admin from scratch</div><div class="slug">/designing-an-invite-only-admin</div></td>
+              <td class="muted">Ada Lovelace</td>
+              <td><span class="badge b-pub">Published</span></td>
+              <td class="muted">Jun 2, 2026</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+            <tr>
+              <td><div class="title">Row-level security without the foot-guns</div><div class="slug">/rls-without-foot-guns</div></td>
+              <td class="muted">Grace Hopper</td>
+              <td><span class="badge b-pub">Published</span></td>
+              <td class="muted">May 28, 2026</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+            <tr>
+              <td><div class="title">A repeatable CMS resource pattern</div><div class="slug">/repeatable-cms-resource-pattern</div></td>
+              <td class="muted">Ada Lovelace</td>
+              <td><span class="badge b-sched">Scheduled</span></td>
+              <td class="muted">Jun 9, 2026</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+            <tr>
+              <td><div class="title">Two-factor auth that people actually finish</div><div class="slug">/two-factor-auth-people-finish</div></td>
+              <td class="muted">Alan Turing</td>
+              <td><span class="badge b-draft">Draft</span></td>
+              <td class="muted">—</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+            <tr>
+              <td><div class="title">Shipping an audit log your compliance team trusts</div><div class="slug">/shipping-an-audit-log</div></td>
+              <td class="muted">Grace Hopper</td>
+              <td><span class="badge b-pub">Published</span></td>
+              <td class="muted">May 21, 2026</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+            <tr>
+              <td><div class="title">From WordPress to Next.js + Supabase in a weekend</div><div class="slug">/wordpress-to-nextjs-supabase</div></td>
+              <td class="muted">Alan Turing</td>
+              <td><span class="badge b-draft">Draft</span></td>
+              <td class="muted">—</td>
+              <td class="r"><div class="acts"><span class="iconbtn">✏️</span><span class="iconbtn">⧉</span><span class="iconbtn del">🗑</span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
