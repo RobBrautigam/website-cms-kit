@@ -65,6 +65,8 @@ export default function StagingView({ changes, viewerId, names, reviewRequired }
         router.refresh()
       } else {
         toast.error(result.error)
+        // Another admin may have moved or published it: show the current list.
+        router.refresh()
       }
     })
   }

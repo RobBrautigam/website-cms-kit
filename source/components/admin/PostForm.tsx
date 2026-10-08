@@ -278,6 +278,18 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
                 {saving ? 'Saving...' : 'Publish now'}
               </button>
             </>
+          ) : staged ? (
+            // A draft with a staged copy: the form holds the staged copy, so
+            // saving goes back to it. Writing the draft row here would be
+            // overwritten when the staged copy is published.
+            <button
+              type="button"
+              onClick={() => handleStage(false)}
+              disabled={saving}
+              className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save staged copy'}
+            </button>
           ) : (
             <>
               {isEditing && (
@@ -306,7 +318,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
         <div className="mb-4 p-3 rounded-lg border border-accent/30 bg-accent/5 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm text-text-secondary">
             You are editing the staged copy ({reviewLabel(staged.reviewStatus)}). The live post stays as it is until
-            this is published. Saving again sends it back to Staged.
+            this is published. Changing it sends it back to Staged.
           </span>
           <Link href="/admin/staging" className="text-sm font-bold text-accent hover:underline">Open staging</Link>
         </div>
@@ -317,7 +329,13 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
         <PostMetaSidebar
           meta={meta}
           onChange={setMeta}
-          statusLockedNote={isLive ? 'Live. To take it down, use the status badge on the posts list.' : undefined}
+          statusLockedNote={
+            isLive
+              ? 'Live. To take it down, use the status badge on the posts list.'
+              : staged
+                ? 'Staged. Publish it from Staging, or discard the staged copy to change the status here.'
+                : undefined
+          }
         />
       </div>
 

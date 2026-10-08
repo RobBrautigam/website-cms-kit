@@ -46,21 +46,27 @@ export async function getPreviewPost(slug: string) {
   const supabase = await previewClient()
   if (!supabase) return null
   // Plain equality filters only: the slug comes from the URL.
-  const byStagedSlug = await supabase
-    .from('blog_post_staged_changes')
-    .select('*, post:blog_posts(*)')
-    .eq('slug', slug)
-    .limit(1)
-  let stage = (byStagedSlug.data?.[0] as StageWithPost | undefined) ?? null
-  if (!stage) {
-    const { data: live } = await supabase.from('blog_posts').select('id').eq('slug', slug).maybeSingle()
-    if (!live) return null
+  // The post that owns this slug today wins, with its own staged copy, so a
+  // staged rename of another post cannot shadow it. Only a slug no post owns
+  // yet (a staged rename or a staged new post) is looked up among staged
+  // copies, oldest first so the result is stable.
+  let stage: StageWithPost | null = null
+  const { data: owner } = await supabase.from('blog_posts').select('id').eq('slug', slug).maybeSingle()
+  if (owner) {
     const byPost = await supabase
       .from('blog_post_staged_changes')
       .select('*, post:blog_posts(*)')
-      .eq('post_id', live.id)
+      .eq('post_id', owner.id)
       .maybeSingle()
     stage = (byPost.data as StageWithPost | null) ?? null
+  } else {
+    const byStagedSlug = await supabase
+      .from('blog_post_staged_changes')
+      .select('*, post:blog_posts(*)')
+      .eq('slug', slug)
+      .order('staged_at', { ascending: true })
+      .limit(1)
+    stage = (byStagedSlug.data?.[0] as StageWithPost | undefined) ?? null
   }
   if (!stage?.post) return null
   return { ...mapPost(overlay(stage.post, stage)), staged: true as const }

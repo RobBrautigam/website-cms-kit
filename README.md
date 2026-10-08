@@ -80,10 +80,10 @@ flowchart LR
 ```
 
 - **A copy, never an overwrite.** One staged copy per post, in its own table. A brand-new draft can be staged too, so it goes through the same review.
-- **Two people for an approval.** A change in review cannot be published until a different admin approves it, and editing an approved change sends it back to staged. The database enforces this with a trigger, whatever client writes the row.
-- **Review is optional by default.** Any admin can still publish a staged change straight away; one switch in the migration and one constant make review mandatory.
+- **Two people for an approval.** Nobody approves their own change, and editing an approved change sends it back to staged. The database enforces this with a trigger, whatever client writes the row. A change in review cannot be published while it stays in review; any admin can withdraw the request, and the audit log records who did.
+- **Review is optional by default.** Any admin can still publish a staged change straight away. One switch in the migration and one constant make the staging screens publish approved changes only; they do not lock the editor's direct draft saves or the Data API, so real two-person control needs those locked too ([docs/10](docs/10-staging-and-approval.md)).
 - **Publish the ones you pick.** The Staging page publishes a selection in one transaction: all of them or none.
-- **The public site cannot read a staged row.** The public key has no grant and no policy on the table, and the public data layer never queries it. The preview reads staged rows only for a signed-in admin, through Next.js draft mode turned on by a form posted from the admin.
+- **The public site cannot read a staged row.** The public key has no grant and no policy on the table, and the public data layer never queries it. The preview reads staged rows only for a signed-in admin, through Next.js draft mode turned on by a form posted from the admin. (Images uploaded for a staged change are public by their random URL from the moment of upload.)
 - **Every step is in the audit log:** staged, review requested, approved, withdrawn, discarded, published, and preview turned on.
 
 The full model, the roles table and the tests: [docs/10-staging-and-approval.md](docs/10-staging-and-approval.md).

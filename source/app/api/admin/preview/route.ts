@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { draftMode } from 'next/headers'
 import { requireAdmin } from '@/lib/auth/require'
 import { recordAdminAction } from '@/lib/auth/audit'
-import { isSameOriginPost, safePreviewPath } from '@/lib/staging/rules'
+import { isSameOriginPost, publicOrigin, safePreviewPath } from '@/lib/staging/rules'
 
 /**
  * POST /api/admin/preview  (form field `path`, default `/`)
@@ -16,7 +16,9 @@ import { isSameOriginPost, safePreviewPath } from '@/lib/staging/rules'
  * admin session on every request. See docs/10-staging-and-approval.md.
  */
 export async function POST(request: NextRequest) {
-  if (!isSameOriginPost(request.headers.get('origin'), request.headers.get('sec-fetch-site'), request.url)) {
+  const h = request.headers
+  const site = publicOrigin(h.get('x-forwarded-host'), h.get('x-forwarded-proto'), h.get('host'), request.url)
+  if (!isSameOriginPost(h.get('origin'), h.get('sec-fetch-site'), site)) {
     return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 })
   }
   await requireAdmin()
@@ -33,6 +35,7 @@ export async function POST(request: NextRequest) {
     resource_type: 'staging',
     payload: { path },
   })
-  // 303 so the browser follows with a GET.
-  return NextResponse.redirect(new URL(path, request.url), 303)
+  // 303 so the browser follows with a GET. A relative Location stays on the
+  // host the browser used (request.url can be the server's bind address).
+  return new NextResponse(null, { status: 303, headers: { Location: path } })
 }

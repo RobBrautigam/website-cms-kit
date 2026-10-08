@@ -33,7 +33,7 @@ This is the shape the mature systems use. Payload keeps a published document in 
 | Published | none | the live row | the live row |
 | Published | yes | the live row | the staged copy |
 | Draft or scheduled | none | nothing | nothing (a draft is not proposed for the site until it is staged) |
-| Draft or scheduled | yes | nothing | the staged copy, marked "New" |
+| Draft or scheduled | yes | nothing | the staged copy, marked "New" (publishing it makes a draft live now; a scheduled post keeps its date) |
 
 A draft that has never been published can be staged too ("Stage for publishing"), so a new post goes through the same review as an edit.
 
@@ -65,18 +65,20 @@ The kit has two live roles (`super_admin` and `admin`, see [03](03-authorization
 | Stage changes, edit a staged change | Any active admin on a two-factor (AAL2) session | `requireAdmin()` in the server action; RLS on the table (admin plus the two-factor rule) |
 | Request review, withdraw a request | Any active admin, AAL2 | Same, plus the trigger's transition rules |
 | Approve | Any active admin, AAL2, who did not stage the content | Same, plus the trigger's "not your own change" rule |
-| Publish selected, Publish now | Any active admin, AAL2; a change waiting in review cannot be published until it is approved | `publish_staged_posts()`, which runs with the caller's rights (`security invoker`), so RLS on both tables applies |
+| Publish selected, Publish now | Any active admin, AAL2; a change waiting in review cannot be published while it stays in review (any admin can withdraw the request; "Publish now" refuses it) | `publish_staged_posts()`, which runs with the caller's rights (`security invoker`), so RLS on both tables applies |
 | Discard | Any active admin, AAL2 | RLS delete policy |
 | Read a staged change | Active admins only, AAL2 once they have a factor | RLS; `anon` has no grant on the table at all |
 
-**Making review mandatory.** By default review is opt-in per change: "Publish now" works on a change nobody asked to review, the way publishing works today. A team that wants every live change signed off by a second person changes `false` to `true` in two places, `public.staging_review_required()` in the migration and `REVIEW_REQUIRED` in `lib/staging/rules.ts`, so that only `approved` rows publish, and hides "Publish now" in the editor. The tests cover both settings.
+**Making review mandatory.** By default review is opt-in per change: "Publish now" works on a change nobody asked to review, the way publishing works today. Changing `false` to `true` in two places, `public.staging_review_required()` in the migration and `REVIEW_REQUIRED` in `lib/staging/rules.ts`, makes the staging screens and `publish_staged_posts()` refuse every change that is not `approved`; hide "Publish now" in the editor too. The tests cover both settings.
+
+**What the switch does not do.** It does not stop an admin writing `blog_posts` directly: the editor's Update on a draft with no staged copy, the posts list's publish button, creating a post as Published, or a call to the Data API with an admin session. A team that needs real two-person control must also lock those paths: route the editor and the posts list through staging, and refuse direct content and status writes on `blog_posts` in the database (for example, revoke `update` on those columns from `authenticated` and make the publish function the only writer). The kit does not do this yet.
 
 ## Publishing
 
 `publish_staged_posts(stage_ids uuid[])` is one SQL function, so publishing the changes you pick is **all or nothing**: either every picked change goes live or none does. For each staged change it:
 
 1. Locks the staged row (`for update`) and refuses one that is waiting in review.
-2. Copies the staged fields onto the live `blog_posts` row, sets `status = 'published'` and keeps the original `published_at` (a first publish sets it to now).
+2. Copies the staged fields onto the live `blog_posts` row, sets `status = 'published'` and keeps the original `published_at` (a first publish sets it to now). A scheduled post keeps `status = 'scheduled'` and its date: only its content changes.
 3. Deletes the staged row.
 
 It returns the published post ids. A slug that another live post already uses fails the whole batch with Postgres's unique-violation code, which `wrapSupabaseError()` turns into a friendly "already exists" message. The function runs as the caller (`security invoker`), not as its owner: a function that bypassed RLS and sat in an exposed schema would be callable by anyone holding a session (Supabase's own guidance on `security definer`), so this one gets no extra powers at all.
@@ -102,7 +104,7 @@ The tests prove the first two with the database itself: as `anon`, selecting the
 There are two previews, both behind the admin's own session:
 
 1. **The staging page, `/admin/staging`.** It lists every staged change with its review state, lets you pick changes and publish them together, request review, approve, withdraw and discard, and shows the blog as it is live beside the blog as it will be once the staged changes are published.
-2. **Your real pages with staged content, through Next.js draft mode.** "Open the staged site" is a small form that posts `path=/blog` to `POST /api/admin/preview`. The route refuses a request from another site (the `Origin` header must be this site), runs `requireAdmin()`, accepts only an on-site path (one leading slash, never `//` or a backslash), turns on draft mode, records an audit row and redirects. It is a POST and not a link because it changes a cookie: a link on another site could otherwise switch it on. Your public pages then branch on draft mode:
+2. **Your real pages with staged content, through Next.js draft mode.** "Open the staged site" is a small form that posts `path=/blog` to `POST /api/admin/preview`. The route refuses a request from another site (the `Origin` header must match the site's public origin, read from the proxy's `X-Forwarded-Host`, then the `Host` header, because under `next start` behind a proxy `request.url` carries the server's bind address; with no `Origin`, `Sec-Fetch-Site` must say `same-origin`), runs `requireAdmin()`, accepts only an on-site path (one leading slash, never `//` or a backslash), turns on draft mode, records an audit row and redirects. It is a POST and not a link because it changes a cookie: a link on another site could otherwise switch it on. Your public pages then branch on draft mode:
 
 ```tsx
 // app/blog/[slug]/page.tsx (your site's own page)
@@ -154,4 +156,7 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 - **Posts only.** Jobs, testimonials and redirects still save live. The same table, trigger and function shape applies to each; copy the posts block.
 - **One staged copy per post.** Two people editing the same live post edit the same staged copy, the way Sanity keeps one draft per document. Saving resets any approval, so nobody publishes content that changed after it was approved.
 - **No history of staged versions.** Publishing deletes the staged row; the audit log keeps who did what, not the old text. Revisions (every save kept, compare, restore) is the next feature and builds on this table.
-- **Scheduled posts are separate.** A scheduled post goes live by its own date; staging does not schedule.
+- **Scheduled posts are separate.** A scheduled post goes live by its own date; staging does not schedule. Publishing a scheduled post's staged copy updates the content it will go live with and keeps its status and date.
+- **Images are public by URL from upload.** Staged text is private, but an image uploaded while editing a staged change goes to the public `blog-images` bucket at once. Its random name keeps it unguessable, not access-controlled.
+- **A slug swap needs two steps.** Publishing two staged changes that swap slugs in one batch fails on the unique slug. Publish one under a temporary slug first.
+- **A change in review can be withdrawn by any admin.** "A change in review cannot be published" holds while it stays in review; withdrawing the request (Staging page) makes it publishable again, and the audit log records who withdrew it. Changing the content of a change in review also takes it out of review, and the audit log records that as a withdrawal. "Publish now" refuses a change in review.

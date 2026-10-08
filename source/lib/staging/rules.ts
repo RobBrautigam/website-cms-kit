@@ -147,6 +147,41 @@ export function isSameOriginPost(origin: string | null, fetchSite: string | null
   return fetchSite === 'same-origin'
 }
 
+/**
+ * The site's public origin. Under `next start` behind a proxy, a route's
+ * `request.url` carries the server's bind address (http://localhost:3000),
+ * not the address the browser used, so compare against the proxy's
+ * X-Forwarded-Host (first value), then the Host header, then the URL.
+ * A cross-site form cannot set either header, so this does not weaken the
+ * same-origin check.
+ */
+export function publicOrigin(
+  forwardedHost: string | null,
+  forwardedProto: string | null,
+  host: string | null,
+  requestUrl: string
+): string {
+  const first = (v: string | null) => (v ? v.split(',')[0].trim() : '')
+  const url = new URL(requestUrl)
+  const fHost = first(forwardedHost)
+  if (fHost) return `${first(forwardedProto) || 'https'}://${fHost}`
+  const h = first(host)
+  if (h) return `${url.protocol}//${h}`
+  return url.origin
+}
+
+/**
+ * "Publish now" saves the editor's content over the staged copy and
+ * publishes it. On a change waiting for review that would cancel the
+ * request without a trace, so it is refused; withdraw it first.
+ */
+export function publishNowRefusal(existing: ReviewStatus | null): string | null {
+  if (existing === 'in_review') {
+    return "This change is waiting for a teammate's review. Withdraw the request on the Staging page first, or ask them to approve it."
+  }
+  return null
+}
+
 const LABELS: Record<ReviewStatus, string> = {
   staged: 'Staged',
   in_review: 'In review',

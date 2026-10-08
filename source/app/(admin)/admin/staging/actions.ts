@@ -19,6 +19,7 @@ import {
   availableActions,
   checkPublishSelection,
   pickStagedContent,
+  publishNowRefusal,
   type ReviewStatus,
   type StagedSummary,
 } from "@/lib/staging/rules";
@@ -54,7 +55,8 @@ async function readStage(stageId: string): Promise<StageRow | null> {
 
 /**
  * Save the editor's content as the post's staged copy (create or replace).
- * The live post is not touched. Saving resets any review or approval.
+ * The live post is not touched. Changing the content resets any review or
+ * approval (the trigger does it), and the reset is audited as a withdrawal.
  */
 export async function stageChanges(
   postId: string,
@@ -69,14 +71,14 @@ export async function stageChanges(
   const supabase = await createServerSupabaseClient();
   const { data: existing } = await supabase
     .from("blog_post_staged_changes")
-    .select("id")
+    .select("id, review_status")
     .eq("post_id", postId)
     .maybeSingle();
 
   const write = existing
     ? supabase.from("blog_post_staged_changes").update(picked).eq("id", existing.id)
     : supabase.from("blog_post_staged_changes").insert({ post_id: postId, ...picked });
-  const { data, error } = await write.select("id").single();
+  const { data, error } = await write.select("id, review_status").single();
   const wrapped = wrapSupabaseError(error);
   if (wrapped) return wrapped;
   if (!data) return err("Post not found.", "not_found");
@@ -87,6 +89,14 @@ export async function stageChanges(
     resource_id: postId,
     payload: { title: picked.title, slug: picked.slug, created: !existing },
   });
+  if (existing && existing.review_status !== "staged" && data.review_status === "staged") {
+    await recordAdminAction({
+      action: "blog_post.withdraw_review",
+      resource_type: "blog_post",
+      resource_id: postId,
+      payload: { title: picked.title, from: existing.review_status, reason: "content changed" },
+    });
+  }
   revalidateStaging(postId);
   return ok({ stageId: data.id as string });
 }
@@ -192,8 +202,9 @@ export async function publishStaged(
   await requireAdmin();
   const unique = Array.from(new Set(stageIds));
   const ids = unique.filter((id) => typeof id === "string" && UUID.test(id));
-  if (ids.length === 0 || ids.length !== unique.length)
-    return err("Pick at least one staged change to publish.", "validation");
+  if (unique.length === 0) return err("Pick at least one staged change to publish.", "validation");
+  if (ids.length !== unique.length)
+    return err("One of the picked changes is not valid. Reload the page and pick again.", "validation");
 
   const supabase = await createServerSupabaseClient();
   const { data: picked, error: readError } = await supabase
@@ -245,12 +256,24 @@ export async function publishStaged(
 
 /**
  * "Publish now" in the editor: stage the content, then publish that one
- * change. If the publish fails, the work is safe in the staged copy.
+ * change. If the publish fails, the work is safe in the staged copy. A change
+ * waiting for review is refused rather than silently taken out of review.
  */
 export async function publishNow(
   postId: string,
   content: Record<string, unknown>
 ): Promise<ActionResult> {
+  await requireAdmin();
+  if (!UUID.test(postId)) return err("Unknown post.", "validation");
+  const supabase = await createServerSupabaseClient();
+  const { data: existing } = await supabase
+    .from("blog_post_staged_changes")
+    .select("review_status")
+    .eq("post_id", postId)
+    .maybeSingle();
+  const refusal = publishNowRefusal((existing?.review_status as ReviewStatus | undefined) ?? null);
+  if (refusal) return err(refusal, "validation");
+
   const staged = await stageChanges(postId, content);
   if (!staged.ok) return staged;
   const published = await publishStaged([staged.data!.stageId]);

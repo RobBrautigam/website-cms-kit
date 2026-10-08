@@ -55,7 +55,9 @@ alter table public.blog_post_staged_changes enable row level security;
 -- Lock 1: the public key gets nothing, not even a select that RLS would
 -- filter to zero rows. (Supabase grants every new public table to anon by
 -- default; this takes it back.)
-revoke all on table public.blog_post_staged_changes from public, anon;
+-- Signed-in users get the four verbs RLS governs and nothing else (Supabase's
+-- default grant also hands out TRUNCATE, which RLS does not cover).
+revoke all on table public.blog_post_staged_changes from public, anon, authenticated;
 grant select, insert, update, delete on table public.blog_post_staged_changes to authenticated;
 grant all on table public.blog_post_staged_changes to service_role;
 
@@ -165,7 +167,9 @@ begin
       raise exception 'Only a signed-in admin can approve a staged change.'
         using errcode = 'check_violation';
     end if;
-    if caller = old.staged_by then
+    -- A row written by a job or the service role has no stager; then the
+    -- person who asked for the review counts as its author.
+    if caller = coalesce(old.staged_by, old.review_requested_by) then
       raise exception 'You cannot approve a change you staged. Ask a teammate to approve it.'
         using errcode = 'check_violation';
     end if;
@@ -197,9 +201,12 @@ create trigger blog_post_staged_changes_guard
 -- ----------------------------------------------------------------------------
 -- Review is opt-in per change by default: a change nobody asked to review can
 -- be published at once ("Publish now"), and a change waiting in review cannot
--- be published until it is approved. To require a second person's approval
--- for EVERY live change, change `false` to `true` here (and hide "Publish now"
--- in the editor).
+-- be published while it stays in review (any admin can withdraw the request).
+-- Changing `false` to `true` here makes this function refuse every staged
+-- change that is not approved. It does NOT stop an admin writing blog_posts
+-- directly (the editor's draft save, the posts list's publish button, or a
+-- Data API call): a team that needs two-person control must also lock those
+-- paths (docs/10, "Making review mandatory").
 create or replace function public.staging_review_required()
   returns boolean
   language sql
@@ -257,8 +264,11 @@ begin
           categories = s.categories,
           meta_description = s.meta_description,
           author_slug = s.author_slug,
-          status = 'published',
+          -- A scheduled post keeps its date: publishing its staged copy
+          -- updates the content it will go live with, not when.
+          status = case when p.status = 'scheduled' then 'scheduled' else 'published' end,
           published_at = case
+            when p.status = 'scheduled' then p.published_at
             when p.status = 'published' and p.published_at is not null then p.published_at
             else now()
           end

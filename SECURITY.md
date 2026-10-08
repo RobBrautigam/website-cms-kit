@@ -34,7 +34,7 @@ Around those layers:
 - **Audit log.** Sign-ins, content changes and every permission change write an append-only row with who, what, when and the client IP as reported by the request's headers. Only the header your host or edge sets is trustworthy (`cf-connecting-ip` behind Cloudflare); behind anything else, a client can send that header itself.
 - **Uploads.** Only active admins can write to the image bucket (Storage RLS). The bucket enforces a 5 MB limit server-side and accepts only uploads declared as JPEG, PNG, WebP or GIF; SVG is excluded on purpose. The type is the one the client declares, not a check of the file's bytes. File names are random, and the extension comes from the checked type, never the uploaded name.
 - **Secrets.** The service-role (or secret) key is used only in server modules; `server.ts` imports `server-only` so a client import fails the build.
-- **Staging.** Staged edits live in a private table with no grant and no policy for the public key, and the public data layer never reads it. The whole-site preview turns on Next.js draft mode only from a same-origin form posted by an admin, and its reads re-check the admin and use the visitor's own session, so a copied preview cookie shows the live site. A change in review needs a different admin to approve it; the database enforces that.
+- **Staging.** Staged edits live in a private table with no grant and no policy for the public key, and the public data layer never reads it. The whole-site preview turns on Next.js draft mode only from a same-origin form posted by an admin, and its reads re-check the admin and use the visitor's own session, so a copied preview cookie shows the live site. A change in review needs a different admin to approve it; the database enforces that. Images uploaded for a staged change are public by their random URL from the moment of upload.
 
 ## Known limitations
 
@@ -45,6 +45,8 @@ These are documented choices, not oversights. Each has a recommended fix in the 
 - **The audit log is append-only by policy, not by trigger.** No role but the server's can write it, but the service-role key could still change rows. If you need tamper evidence, add a trigger that rejects updates and deletes, or ship rows to external storage.
 - **Making new recovery codes needs an AAL2 session but not a fresh password.** A stolen, already-verified session could replace the codes. Turning two-factor off does re-check the password; asking for the password (or a TOTP code) before regenerating codes too is the recommended hardening.
 - **The redirect hit counter is callable by anyone** (it is how public visits are counted). Treat the counts as approximate.
+- **Mandatory review is not two-person control by itself.** Turning on `staging_review_required()` makes the staging screens and the publish function accept approved changes only; an admin can still write `blog_posts` directly (the editor's draft save, the posts list, the Data API). [docs/10](docs/10-staging-and-approval.md) says what to lock as well.
+- **Older admin API routes rely on SameSite cookies for cross-site protection.** The new preview routes check `Origin` (or `Sec-Fetch-Site`); the two-factor, user-management, upload and AI routes do not yet. A sibling subdomain counts as same-site, so add the same check if you host other apps on subdomains of the admin's domain.
 
 ## Supported versions
 

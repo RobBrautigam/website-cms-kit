@@ -9,6 +9,8 @@ import {
   checkPublishSelection,
   isSameOriginPost,
   pickStagedContent,
+  publicOrigin,
+  publishNowRefusal,
   reviewLabel,
   safePreviewPath,
 } from './rules.ts'
@@ -108,6 +110,25 @@ test('the preview switch only accepts a form posted from this site', () => {
   assert.equal(isSameOriginPost('null', 'same-origin', url), true)
   assert.equal(isSameOriginPost(null, 'cross-site', url), false)
   assert.equal(isSameOriginPost(null, null, url), false)
+})
+
+test('behind a proxy, the site origin comes from the forwarded host, not the server bind address', () => {
+  const internal = 'http://localhost:3000/api/admin/preview'
+  assert.equal(publicOrigin('cms.example.com', 'https', 'localhost:3000', internal), 'https://cms.example.com')
+  assert.equal(publicOrigin('cms.example.com, proxy.internal', 'https, http', null, internal), 'https://cms.example.com')
+  assert.equal(publicOrigin('cms.example.com', null, null, internal), 'https://cms.example.com')
+  assert.equal(publicOrigin(null, null, 'cms.example.com', internal), 'http://cms.example.com')
+  assert.equal(publicOrigin(null, null, null, 'https://site.example/api/admin/preview'), 'https://site.example')
+  // The browser's own Origin then matches on a proxied deploy.
+  assert.equal(isSameOriginPost('https://cms.example.com', null, publicOrigin('cms.example.com', 'https', 'localhost:3000', internal)), true)
+  assert.equal(isSameOriginPost('https://evil.example', null, publicOrigin('cms.example.com', 'https', 'localhost:3000', internal)), false)
+})
+
+test('"Publish now" refuses a change that is waiting for review, and allows the rest', () => {
+  assert.match(publishNowRefusal('in_review'), /waiting for a teammate's review/)
+  assert.equal(publishNowRefusal('staged'), null)
+  assert.equal(publishNowRefusal('approved'), null)
+  assert.equal(publishNowRefusal(null), null)
 })
 
 test('review states have plain labels', () => {

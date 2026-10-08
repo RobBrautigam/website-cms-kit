@@ -366,6 +366,37 @@ test('a non-admin cannot discard a staged change', () => scenario(async () => {
   assert.equal((await rows(`select id from public.blog_post_staged_changes`)).length, 1)
 }))
 
+test('publishing a staged scheduled post updates its content and keeps its schedule', () => scenario(async () => {
+  await asOwner()
+  await db.query(`update public.blog_posts set status = 'scheduled', published_at = '2030-01-01T09:00:00+00:00' where id = $1`, [DRAFT])
+  await asUser(ADMIN); const s = await stage(DRAFT, 'Fixed wording', 'draft-post')
+  await publish([s.id])
+  const post = await livePost(DRAFT)
+  assert.equal(post.title, 'Fixed wording')
+  assert.equal(post.status, 'scheduled')
+  assert.equal(new Date(post.published_at).toISOString(), '2030-01-01T09:00:00.000Z')
+  assert.equal((await rows(`select id from public.blog_post_staged_changes`)).length, 0)
+}))
+
+test('a change with no recorded stager cannot be approved by the person who asked for review', () => scenario(async () => {
+  await asOwner()
+  const [s] = await rows(`insert into public.blog_post_staged_changes (post_id, title, slug, body) values ($1, 'From a job', 'live-post', '{}') returning *`, [LIVE])
+  assert.equal(s.staged_by, null)
+  await asUser(ADMIN); await setStatus(s.id, 'in_review')
+  await expectError(`update public.blog_post_staged_changes set review_status = 'approved' where id = $1`, [s.id], /cannot approve/)
+  await asUser(SUPER)
+  assert.equal((await setStatus(s.id, 'approved')).approved_by, SUPER)
+}))
+
+test('signed-in users hold only select, insert, update and delete on staged changes (no truncate)', () => scenario(async () => {
+  const [p] = await rows(`select
+    has_table_privilege('authenticated', 'public.blog_post_staged_changes', 'TRUNCATE') as t,
+    has_table_privilege('authenticated', 'public.blog_post_staged_changes', 'REFERENCES') as r,
+    has_table_privilege('authenticated', 'public.blog_post_staged_changes', 'TRIGGER') as g,
+    has_table_privilege('authenticated', 'public.blog_post_staged_changes', 'SELECT,INSERT,UPDATE,DELETE') as crud`)
+  assert.deepEqual(p, { t: false, r: false, g: false, crud: true })
+}))
+
 test('deleting a post deletes its staged copy', () => scenario(async () => {
   await asUser(ADMIN); await stage(LIVE)
   await db.query(`delete from public.blog_posts where id = $1`, [LIVE])

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { draftMode } from 'next/headers'
-import { isSameOriginPost } from '@/lib/staging/rules'
+import { isSameOriginPost, publicOrigin } from '@/lib/staging/rules'
 
 /**
  * POST /api/admin/preview/exit
@@ -11,9 +11,11 @@ import { isSameOriginPost } from '@/lib/staging/rules'
  * preview off.
  */
 export async function POST(request: NextRequest) {
-  if (!isSameOriginPost(request.headers.get('origin'), request.headers.get('sec-fetch-site'), request.url)) {
+  const h = request.headers
+  const site = publicOrigin(h.get('x-forwarded-host'), h.get('x-forwarded-proto'), h.get('host'), request.url)
+  if (!isSameOriginPost(h.get('origin'), h.get('sec-fetch-site'), site)) {
     return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 })
   }
   ;(await draftMode()).disable()
-  return NextResponse.redirect(new URL('/admin/staging', request.url), 303)
+  return new NextResponse(null, { status: 303, headers: { Location: '/admin/staging' } })
 }
