@@ -19,8 +19,10 @@ export async function updateSession(request: NextRequest) {
         },
         // `headers` (from @supabase/ssr 0.10) carries the no-store cache
         // headers that must travel with a refreshed session cookie, so a CDN
-        // never serves one visitor's session to another.
-        setAll(cookiesToSet, headers?: Record<string, string>) {
+        // never serves one visitor's session to another. Left untyped on
+        // purpose: its type comes from the library, so an older @supabase/ssr
+        // fails the type check instead of silently dropping the headers.
+        setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
@@ -65,8 +67,19 @@ export async function updateSession(request: NextRequest) {
   // on /admin/reset-password because a logged-in user might legitimately
   // be in the middle of a magic-link callback that just established the
   // session - they still need to set their password.
+  //
+  // Confirm with getUser() first. Valid claims only prove the token was
+  // signed and has not expired; a session revoked server-side (signed out on
+  // another device, a deactivated admin, a non-admin that requireAdmin()
+  // just signed out) still carries valid claims until the token expires.
+  // requireAdmin() rejects it with getUser() and redirects here, so bouncing
+  // on claims alone would loop between the two. This costs one Auth call,
+  // only when a signed-in browser opens the login page.
   if (pathname === '/admin/login' && isSignedIn) {
-    return redirectKeepingSession(request, '/admin/posts', supabaseResponse)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      return redirectKeepingSession(request, '/admin/posts', supabaseResponse)
+    }
   }
 
   return supabaseResponse

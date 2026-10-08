@@ -11,7 +11,7 @@ Stand up the admin CMS on a fresh Next.js 16 + Supabase project, in order. Each 
 ## 1. Install dependencies
 
 ```bash
-npm i @supabase/ssr @supabase/supabase-js server-only zod react-hook-form @hookform/resolvers sonner lucide-react bcryptjs
+npm i @supabase/ssr@^0.10 @supabase/supabase-js server-only zod react-hook-form @hookform/resolvers sonner lucide-react bcryptjs
 # Rich-text editor (posts resource). TipTap 3's StarterKit includes Link and Underline:
 npm i @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-placeholder @tiptap/pm
 # Help page renderer (optional):

@@ -36,8 +36,13 @@ export async function POST(req: Request) {
     return Response.json({ error: "Wrong password" }, { status: 401 });
   }
   // End the extra session the check created. Local scope only: a global
-  // sign-out would end the user's real session too.
-  await verifier.auth.signOut({ scope: "local" });
+  // sign-out would end the user's real session too. A failure here leaves one
+  // orphan session row (its tokens never left server memory), so log it and
+  // carry on rather than fail the user's request.
+  const { error: signOutError } = await verifier.auth.signOut({ scope: "local" });
+  if (signOutError) {
+    console.error("mfa/disable: verifier sign-out failed", signOutError.message);
+  }
 
   const supabase = await createServerSupabaseClient();
   const { error: unenrollError } = await supabase.auth.mfa.unenroll({

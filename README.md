@@ -39,7 +39,7 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 
 ## How a request is checked
 
-Three layers, and each one can deny on its own:
+Three layers. Each refuses on its own what it checks, and the database is the layer every write passes through:
 
 ```mermaid
 flowchart LR
@@ -48,14 +48,14 @@ flowchart LR
   P --> G["2. Server gate<br/>requireAdmin(): user, role,<br/>deactivation, two-factor"]
   G -->|"fails"| L
   G --> S["Page or server action<br/>cookie-scoped Supabase client"]
-  S --> R[("3. Postgres RLS<br/>is_admin_or_above()")]
+  S --> R[("3. Postgres RLS<br/>is_admin_or_above(),<br/>AAL2 once enrolled")]
   S -.->|"sensitive changes"| A[("admin_audit_log")]
   V["Public site"] -->|"public key"| R
 ```
 
 1. **The proxy** (`source/proxy.ts`) verifies and refreshes the session on every `/admin/*` request and bounces anyone without one to the login page.
-2. **The server gate** (`requireAdmin()`) re-checks the user, their role, whether they were deactivated and whether two-factor is complete, on every protected page and every mutation. API routes call it themselves, because the proxy does not cover `/api/*`.
-3. **Row-level security** in Postgres is the final word: only active admins can write, and the public key can read published rows only. A leaked public key cannot change anything.
+2. **The server gate** (`requireAdmin()`) re-checks the user, their role, whether they were deactivated and whether two-factor is complete, on every protected page and every server-side mutation. API routes call it themselves, because the proxy does not cover `/api/*`. The editor's browser-side writes (posts, image uploads) skip this layer, so layer 3 carries the two-factor check for them.
+3. **Row-level security** in Postgres is the final word: only active admins can write, an admin with two-factor set up needs a completed two-factor session for any admin read or write (tables and image bucket alike), and the public key can read published rows only. A leaked public key or a stolen password alone cannot change anything.
 
 The full model, what it does not cover, and how to report a problem: [SECURITY.md](SECURITY.md).
 

@@ -20,6 +20,21 @@ const BUCKET = 'blog-images'
 
 export type UploadResult = { url: string } | { error: string }
 
+/**
+ * A random object path for an image of the given extension. randomUUID()
+ * exists only on secure origins (HTTPS or localhost), so fall back to
+ * getRandomValues(), which works on any origin (a phone testing a LAN address).
+ */
+export function newImagePath(ext: string): string {
+  const id =
+    typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+          b.toString(16).padStart(2, '0')
+        ).join('')
+  return `blog/${id}.${ext}`
+}
+
 export async function uploadBlogImage(
   supabase: SupabaseClient,
   file: File
@@ -30,7 +45,7 @@ export async function uploadBlogImage(
   if (!ext) return { error: 'Only JPEG, PNG, WebP or GIF images can be uploaded.' }
   if (file.size > MAX_IMAGE_BYTES) return { error: 'Images must be 5 MB or smaller.' }
 
-  const path = `blog/${crypto.randomUUID()}.${ext}`
+  const path = newImagePath(ext)
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     cacheControl: '31536000',
     contentType: file.type,

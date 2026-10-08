@@ -21,18 +21,22 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
     if (!file) return
 
     setUploading(true)
-
-    const result = await uploadBlogImage(supabase, file)
-    if ('error' in result) {
-      alert(result.error)
+    try {
+      const result = await uploadBlogImage(supabase, file)
+      if ('error' in result) {
+        alert(result.error)
+        return
+      }
+      setPreview(result.url)
+      onUpload(result.url)
+    } catch {
+      alert('Upload failed. Please try again.')
+    } finally {
+      // Always release the button and clear the input, so the same file can
+      // be picked again after an error.
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
-      return
     }
-
-    setPreview(result.url)
-    onUpload(result.url)
-    setUploading(false)
   }
 
   function handleRemove() {
@@ -49,6 +53,7 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview} alt="Preview" className="w-full aspect-[16/9] object-cover" />
           <button
+            type="button"
             onClick={handleRemove}
             className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded hover:bg-black/80 transition"
           >

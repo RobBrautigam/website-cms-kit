@@ -10,12 +10,13 @@
 -- production app. Idempotent where practical (IF NOT EXISTS / OR REPLACE), so
 -- it is safe to re-run.
 --
--- Security model (three layers, each sufficient to deny on its own):
---   1. Proxy gate      — refreshes the session, bounces unauthenticated /admin/*
---   2. requireAdmin()  — re-checks user + role + deactivation + MFA per request
---   3. RLS (this file) — the DB itself only allows admin-or-above writes and
---                        anon reads of PUBLIC rows. A leaked anon key can read
---                        published content but cannot mutate anything.
+-- Security model (three layers; the database is the one every write passes):
+--   1. Proxy gate      - refreshes the session, bounces unauthenticated /admin/*
+--   2. requireAdmin()  - re-checks user + role + deactivation + MFA per request
+--   3. RLS (this file) - the DB itself only allows admin-or-above writes, on an
+--                        AAL2 session once a factor is verified (section 10),
+--                        and anon reads of PUBLIC rows. A leaked anon key can
+--                        read published content but cannot mutate anything.
 -- ============================================================================
 
 
@@ -454,8 +455,8 @@ alter table public.admin_mfa_recovery_codes enable row level security;
 -- every upload is refused, and the tempting quick fix ("authenticated can
 -- insert") would let any signed-in account write, deactivated ones included.
 -- Public READ needs no policy: a public bucket serves objects by URL. The
--- size and type limits are enforced by Storage itself, server-side, whatever
--- the browser claims.
+-- size limit is enforced by Storage itself, server-side. The type allow-list
+-- is checked against the Content-Type the client declares, not the bytes.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'blog-images', 'blog-images', true, 5242880,
@@ -486,6 +487,80 @@ drop policy if exists "blog_images_admin_delete" on storage.objects;
 create policy "blog_images_admin_delete"
   on storage.objects for delete to authenticated
   using (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()));
+
+
+-- ----------------------------------------------------------------------------
+-- 10. Two-factor in the database: no admin data access on a password alone
+-- ----------------------------------------------------------------------------
+-- requireAdmin() sends an AAL1 session to the TOTP step, but the editor writes
+-- posts and images from the browser with the user's own token, which never
+-- passes through requireAdmin(). Without this section, someone holding only a
+-- stolen password could skip the TOTP page and call the database and Storage
+-- APIs directly. These RESTRICTIVE policies are ANDed with every policy above:
+-- a user with a verified factor must be on an AAL2 session to read admin rows
+-- or write anything. Users with no verified factor are unaffected (the app's
+-- enrollment deadline covers them). This is Supabase's documented MFA pattern.
+-- The service role and the security-definer functions bypass RLS, so the
+-- server routes and the anon redirect counter are unaffected; anon reads of
+-- public rows are unaffected too (these policies apply to `authenticated`).
+create or replace function public.mfa_satisfied()
+  returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+      or not exists (
+        select 1 from auth.mfa_factors
+        where user_id = auth.uid()
+          and status = 'verified'
+      );
+$$;
+
+revoke all on function public.mfa_satisfied() from public;
+grant execute on function public.mfa_satisfied() to authenticated, service_role;
+
+-- Content tables: authenticated access here is admin-only, so gate all of it.
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['blog_posts', 'job_openings', 'testimonials', 'url_redirects']
+  loop
+    execute format('drop policy if exists %I on public.%I', t || '_require_mfa', t);
+    execute format(
+      'create policy %I on public.%I as restrictive for all to authenticated '
+      'using (public.mfa_satisfied()) with check (public.mfa_satisfied())',
+      t || '_require_mfa', t
+    );
+  end loop;
+end
+$$;
+
+-- user_roles: gate writes only. A user still reads their own row at AAL1.
+drop policy if exists "user_roles_require_mfa_insert" on public.user_roles;
+create policy "user_roles_require_mfa_insert"
+  on public.user_roles as restrictive for insert to authenticated
+  with check (public.mfa_satisfied());
+
+drop policy if exists "user_roles_require_mfa_update" on public.user_roles;
+create policy "user_roles_require_mfa_update"
+  on public.user_roles as restrictive for update to authenticated
+  using (public.mfa_satisfied())
+  with check (public.mfa_satisfied());
+
+drop policy if exists "user_roles_require_mfa_delete" on public.user_roles;
+create policy "user_roles_require_mfa_delete"
+  on public.user_roles as restrictive for delete to authenticated
+  using (public.mfa_satisfied());
+
+-- Storage is shared by every bucket, so scope the gate to this one.
+drop policy if exists "blog_images_require_mfa" on storage.objects;
+create policy "blog_images_require_mfa"
+  on storage.objects as restrictive for all to authenticated
+  using (bucket_id <> 'blog-images' or public.mfa_satisfied())
+  with check (bucket_id <> 'blog-images' or public.mfa_satisfied());
 
 
 -- ============================================================================

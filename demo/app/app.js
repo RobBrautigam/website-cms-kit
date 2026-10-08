@@ -354,6 +354,17 @@
     var h1 = $('#root h1'); if (h1) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
   }
   window.addEventListener('hashchange', function () { render(false); });
+  // File inputs are visually hidden behind a <label class="btn">, so show the
+  // keyboard focus ring on the label while its input has focus.
+  function fileFocus(on) {
+    return function (e) {
+      var t = e.target;
+      if (!t || t.type !== 'file' || !t.id) return;
+      $all('label[for="' + t.id + '"]').forEach(function (l) { l.classList.toggle('has-focus', on); });
+    };
+  }
+  document.addEventListener('focusin', fileFocus(true));
+  document.addEventListener('focusout', fileFocus(false));
 
   // -------------------------------------------------------------- layout
   var NAV = [
@@ -402,8 +413,8 @@
     $('#root').innerHTML = '<main id="main" class="auth" tabindex="-1"><div class="auth-card">' + inner + '</div></main>';
   }
   // Honesty marker for screens the kit's source does not have yet.
-  function proposedNote(text) {
-    return '<p class="proposed-note"><strong>Proposed feature, not in the kit\'s source yet.</strong> ' + text + '</p>';
+  function proposedNote(text, lead) {
+    return '<p class="proposed-note"><strong>' + (lead || 'Proposed feature, not in the kit\'s source yet.') + '</strong> ' + text + '</p>';
   }
   function head(title, sub, actions) {
     return '<div class="page-head"><div><h1>' + esc(title) + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>' + (actions ? '<div class="row">' + actions + '</div>' : '') + '</div>';
@@ -617,6 +628,7 @@
     db.posts.forEach(function (p) { var s = postState(p); counts[s] = (counts[s] || 0) + 1; if (s === 'changed') counts.published++; });
     shell('posts',
       head('Posts', 'Write, review and publish blog posts.', '<a class="btn btn-primary" href="#/posts/new">' + icon('plus') + 'New post</a>') +
+      proposedNote('The "Changes pending" state (edits to a live post waiting to be published) is part of the proposed staging feature. In the kit today, saving a published post updates it live.', 'Partly proposed.') +
       '<div class="stats">' +
         stat(counts.published, 'Published') + stat(counts.changed, 'Changes pending') + stat(counts.draft, 'Drafts') + stat(counts.scheduled, 'Scheduled') +
       '</div>' +
@@ -694,12 +706,12 @@
       }
     });
   }
-  function stat(n, l) { return '<div class="stat"><div class="n">' + n + '</div><div class="l">' + esc(l) + '</div></div>'; }
+  function stat(n, l) { return '<div class="stat"><div class="n">' + esc(n) + '</div><div class="l">' + esc(l) + '</div></div>'; }
   function opts(list, sel) { return list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === sel ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); }
   function refreshBadges() {
     $all('.sb-link[href="#/site"] .count').forEach(function (el) { el.remove(); });
     var n = stagedChanges().length, link = $('.sb-link[href="#/site"]');
-    if (n && link) link.insertAdjacentHTML('beforeend', '<span class="count" aria-label="' + esc(plural(n, 'staged change', 'staged changes')) + '">' + n + '</span>');
+    if (n && link) link.insertAdjacentHTML('beforeend', '<span class="count"><span aria-hidden="true">' + esc(n) + '</span><span class="sr-only">' + esc(plural(n, 'staged change', 'staged changes')) + '</span></span>');
   }
 
   // ------------------------------------------------------------ editor
@@ -747,7 +759,7 @@
         element: $('#editor'),
         injectCSS: false,
         extensions: [
-          window.TipTap.StarterKit.configure({ heading: { levels: [2, 3] }, link: { openOnClick: false, autolink: true, defaultProtocol: 'https' } }),
+          window.TipTap.StarterKit.configure({ heading: { levels: [2, 3] }, underline: false, link: { openOnClick: false, autolink: true, defaultProtocol: 'https' } }),
           window.TipTap.Image.configure({ inline: false }),
           window.TipTap.Placeholder.configure({ placeholder: 'Start writing your post...' })
         ],
@@ -914,9 +926,9 @@
   }
   function toolbarHtml() {
     var b = function (cmd, label, text, pressed) { return '<button type="button" class="tb" data-cmd="' + cmd + '" aria-label="' + esc(label) + '" title="' + esc(label) + '"' + (pressed ? ' aria-pressed="false"' : '') + '>' + text + '</button>'; };
-    return b('bold', 'Bold', '<strong>B</strong>', 1) + b('italic', 'Italic', '<em>I</em>', 1) + b('underline', 'Underline', '<u>U</u>', 1) + b('strike', 'Strikethrough', '<s>S</s>', 1) +
+    return b('bold', 'Bold', '<strong>B</strong>', 1) + b('italic', 'Italic', '<em>I</em>', 1) +
       '<span class="sep" aria-hidden="true"></span>' + b('h2', 'Heading 2', 'H2', 1) + b('h3', 'Heading 3', 'H3', 1) +
-      '<span class="sep" aria-hidden="true"></span>' + b('bulletList', 'Bulleted list', '&bull; List', 1) + b('orderedList', 'Numbered list', '1. List', 1) + b('blockquote', 'Quote', '&ldquo; Quote', 1) + b('hr', 'Divider line', 'Line') +
+      '<span class="sep" aria-hidden="true"></span>' + b('bulletList', 'Bulleted list', '&bull; List', 1) + b('orderedList', 'Numbered list', '1. List', 1) + b('blockquote', 'Quote', '&ldquo; Quote', 1) +
       '<span class="sep" aria-hidden="true"></span>' + b('link', 'Link', 'Link', 1) + b('image', 'Insert image', 'Image') +
       '<span class="sep" aria-hidden="true"></span>' + b('undo', 'Undo', '&#8630;') + b('redo', 'Redo', '&#8631;');
   }
@@ -1161,6 +1173,7 @@
     setTitle('Team');
     shell('team',
       head('Team', 'Invite people, set their role, and turn access off.', '<button type="button" class="btn btn-primary" data-act="invite">' + icon('plus') + 'Invite someone</button>') +
+      proposedNote('The Invited status, Resend and Cancel invite are proposed. In the kit today an invited person appears on the team right away, marked "Pending first sign-in"; their sign-up link is sent once, with no resend or cancel button.', 'Partly proposed.') +
       '<div class="table-wrap"><table class="tbl"><caption class="sr-only">Team members</caption><thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col" class="col-opt">Two-factor</th><th scope="col" class="col-wide">Status</th><th scope="col" class="actions"><span class="sr-only">Actions</span></th></tr></thead><tbody id="trows"></tbody></table></div>' +
       '<p class="hint">The last active super admin cannot be demoted or turned off, so the account can never lock itself out.</p>'
     );
@@ -1291,13 +1304,14 @@
     setTitle('Redirects');
     shell('redirects',
       head('Redirects', 'Send old addresses to their new home in one hop.', '<button type="button" class="btn btn-primary" data-act="new-redirect">' + icon('plus') + 'New redirect</button>') +
+      proposedNote('The address tester and the checks for loops, two-hop chains, duplicates and reserved paths are proposed. In the kit today a redirect is checked for a path source (no query or fragment), a path or http(s) destination, and no pattern source pointing off-site.', 'Partly proposed.') +
       '<section class="card" aria-labelledby="rt-h"><h2 id="rt-h">Test an address</h2><form id="rtest" class="row" novalidate><label class="sr-only" for="rtest-in">Path to test</label><input class="input grow" id="rtest-in" placeholder="/careers" spellcheck="false"><button class="btn btn-outline" type="submit">' + icon('play') + 'Test</button></form><p id="rtest-out" class="hint" role="status"></p></section>' +
       '<div class="table-wrap mt-16"><table class="tbl"><caption class="sr-only">Redirect rules</caption><thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col" class="col-opt">Type</th><th scope="col" class="col-opt">Visits</th><th scope="col">On</th><th scope="col" class="actions"><span class="sr-only">Actions</span></th></tr></thead><tbody id="rrows"></tbody></table></div>'
     );
     // Max ~50 redirects in the demo. Plain render.
     function draw() {
       $('#rrows').innerHTML = db.redirects.length ? db.redirects.map(function (r) {
-        return '<tr><td class="mono">' + esc(r.from) + '</td><td class="mono">' + esc(r.to) + '</td><td class="col-opt">' + (r.permanent ? '308 permanent' : '307 temporary') + '</td><td class="col-opt">' + r.hits.toLocaleString('en-US') + (r.lastHit ? '<div class="sub">last ' + esc(ago(r.lastHit)) + '</div>' : '') + '</td>' +
+        return '<tr><td class="mono">' + esc(r.from) + '</td><td class="mono">' + esc(r.to) + '</td><td class="col-opt">' + (r.permanent ? '308 permanent' : '307 temporary') + '</td><td class="col-opt">' + esc(Number(r.hits).toLocaleString('en-US')) + (r.lastHit ? '<div class="sub">last ' + esc(ago(r.lastHit)) + '</div>' : '') + '</td>' +
           '<td><label class="check"><input type="checkbox" data-toggle="' + esc(r.id) + '"' + (r.enabled ? ' checked' : '') + '><span class="sr-only">Redirect from ' + esc(r.from) + ' is on</span></label></td>' +
           '<td class="actions"><button type="button" class="icon-btn" data-act="edit-redirect" data-id="' + esc(r.id) + '" aria-label="Edit redirect from ' + esc(r.from) + '">' + icon('edit') + '</button><button type="button" class="icon-btn danger" data-act="del-redirect" data-id="' + esc(r.id) + '" aria-label="Delete redirect from ' + esc(r.from) + '">' + icon('trash') + '</button></td></tr>';
       }).join('') : '<tr><td colspan="6" class="empty">No redirects yet.</td></tr>';
@@ -1340,7 +1354,9 @@
       actions: '<button type="button" class="btn btn-outline" data-close>Cancel</button><button type="submit" class="btn btn-primary">Save redirect</button>',
       onSubmit: function (f, close) {
         var from = $('#r-from', f).value.trim(), to = $('#r-to', f).value.trim(), err = $('#r-err', f);
-        // The kit's lib/redirects/validate.ts rules, demo-sized.
+        // The kit's lib/redirects/validate.ts checks the path and destination
+        // shapes; the reserved-path, loop, duplicate and chain checks are the
+        // proposed additions shown on this page.
         if (!/^\/[^\s?#]*$/.test(from)) { err.textContent = 'From must be a path starting with / (no spaces, no ? or #).'; return; }
         if (/^\/(admin|api|_next)(\/|$)/.test(from)) { err.textContent = 'Paths under /admin, /api and /_next cannot be redirected.'; return; }
         if (!(/^\/[^\s]*$/.test(to) || /^https?:\/\/[^\s]+$/i.test(to))) { err.textContent = 'To must be a path starting with / or a full http(s):// address.'; return; }

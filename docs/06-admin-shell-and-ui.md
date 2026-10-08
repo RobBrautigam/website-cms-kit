@@ -41,7 +41,7 @@ Fonts are `--font-display` / `--font-body` (a system stack by default - point th
 
 ## Image upload (`source/components/admin/ImageUploader.tsx`)
 
-Uploads go straight to the Supabase Storage `blog-images` bucket from the browser client, then return the public URL to the form. Both the featured-image picker and the editor's inline image button use one helper, `lib/admin/upload-image.ts`: it checks type and size, names the file `<random-uuid>.<ext>` under a `blog/` prefix with the extension taken from the checked MIME type (never the file name), and sets a 1-year cache header. The `/api/upload` route is an alternative server-side upload path that shares the same rules. The migration creates the bucket and the Storage policies that let only an active admin write to it (see [08-security-checklist.md](08-security-checklist.md)).
+Uploads go straight to the Supabase Storage `blog-images` bucket from the browser client, then return the public URL to the form. Both the featured-image picker and the editor's inline image button use one helper, `lib/admin/upload-image.ts`: it checks type and size, names the file `<random-uuid>.<ext>` under a `blog/` prefix with the extension taken from the checked MIME type (never the file name), and sets a 1-year cache header. The `/api/upload` route is an alternative server-side upload path that imports the same type list and size cap (nothing in the kit calls it; use it if you want a server to check uploads before they reach Storage). The migration creates the bucket and the Storage policies that let only an active admin write to it (see [08-security-checklist.md](08-security-checklist.md)).
 
 ## Icons + theming notes
 

@@ -10,12 +10,12 @@ Sign in with the pre-filled form (any password works); the two-factor code is `1
 
 ## In the kit today, and what is proposed
 
-Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar and on the page.
+Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar or on the page (a "Partly proposed" note where a page mixes the two).
 
 | | |
 |---|---|
 | **In the kit's source today** | Invite-only sign-in, two-factor and recovery codes, posts with draft, scheduled and published states, a per-post preview, local autosave, the TipTap editor, image upload from the post form, team management, the audit log with CSV export, redirects. (The kit also has jobs, testimonials, a sitemap view and a help page, which the demo leaves out.) |
-| **Proposed, previewed in the demo** | Staged edits on a live post (the kit today updates a live post on save), the whole-site staging preview with publish-selected, and the media library page. |
+| **Proposed, previewed in the demo** | Staged edits on a live post and the "Changes pending" state (the kit today updates a live post on save), the whole-site staging preview with publish-selected, the media library page, resending or cancelling an invite, and the redirect tester with its loop, chain, duplicate and reserved-path checks. |
 | **Demo-only helpers** | The light and dark theme switch (the kit documents how to add one), viewing the admin as another role, reset demo data. |
 
 ## What works
@@ -24,13 +24,13 @@ Most of the demo mirrors code in the kit's source today. A few screens preview f
 |---|---|
 | Sign-in | Demo login, show or hide password, remember me, forgot password, two-factor step, recovery codes (using one turns two-factor off and forces setup again, as in the kit). |
 | Posts | Status counts, search, status and category filters, sort, edit, preview, duplicate, publish, unpublish, delete. |
-| Editor | TipTap rich-text editor (headings, bold, italic, underline, strike, lists, quote, rule, links with a scheme allowlist, images), autosave, URL slug check, word count, schedule, publish, discard staged changes. |
+| Editor | TipTap rich-text editor with the kit's toolbar (headings, bold, italic, lists, quote, links with a scheme allowlist, images), autosave, URL slug check, word count, schedule, publish, discard staged changes. |
 | States | Draft, scheduled, published, and published with staged changes. A live post keeps showing its last published version until you publish the edits. |
 | Site preview | The whole site with every staged change, a live and staging toggle, and publish-selected. |
 | Media | Upload (JPEG, PNG, WebP or GIF up to 5 MB, resized in the browser), alt text, delete, pick as a featured or inline image. |
-| Team | Invite, change role, turn access off and on, reset link, resend or cancel an invite, the last-super-admin guard. |
+| Team | Invite, change role, turn access off and on, reset link, the last-super-admin guard; resend or cancel an invite (proposed). |
 | Audit log | Every action above, filter by type and person, search, 50 rows a page, CSV export (with spreadsheet formula injection neutralized). |
-| Redirects | Add, edit, toggle, delete, a path tester, and validation for loops, duplicates, reserved paths and two-hop chains. |
+| Redirects | Add, edit, toggle, delete, and the kit's path and destination checks; a path tester and checks for loops, duplicates, reserved paths and two-hop chains (proposed). |
 | Settings | Light, dark or system theme, new recovery codes, two-factor off and on, change password with live rules, view the admin as an `admin` instead of a `super_admin`, reset demo data. |
 
 It works at phone and desktop widths, in light and dark themes, with the keyboard alone, and with a screen reader (labeled controls, focus moved to each page's heading, focus-trapped dialogs, announced notifications).

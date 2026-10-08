@@ -21,18 +21,18 @@ Out of scope:
 
 ## The security model in brief
 
-Three layers, each able to deny on its own. Full detail in [docs/02](docs/02-authentication.md), [docs/03](docs/03-authorization-and-rls.md) and the pre-launch [checklist in docs/08](docs/08-security-checklist.md).
+Three layers. Each one refuses on its own what it checks, and the database layer is the one every write passes through. Full detail in [docs/02](docs/02-authentication.md), [docs/03](docs/03-authorization-and-rls.md) and the pre-launch [checklist in docs/08](docs/08-security-checklist.md).
 
 1. **Proxy.** `source/proxy.ts` verifies and refreshes the Supabase session (with `getClaims()`) on every `/admin/*` request and redirects anyone without one. It does not cover `/api/*`.
-2. **Server gate.** `requireAdmin()` re-checks the user with Supabase Auth, their role, whether they were deactivated and whether two-factor is complete (AAL2), on every protected page, server action and API route. User management requires `requireSuperAdmin()`.
-3. **Row-level security.** RLS is on for every table. Writes need an active admin through `SECURITY DEFINER` helpers; the public key reads published rows only. The MFA recovery-code table has no policy at all (server only), and the audit log is readable by super admins only and written only by the server.
+2. **Server gate.** `requireAdmin()` re-checks the user with Supabase Auth, their role, whether they were deactivated and whether two-factor is complete (AAL2), on every protected page and server-side mutation. The routes that run the two-factor flow itself use `requirePartialAdmin()` (no AAL2 check, or the flow could never finish). User management requires `requireSuperAdmin()`. Writes the editor makes from the browser (posts, image uploads) do not pass through this gate; layer 3 governs them.
+3. **Row-level security.** RLS is on for every table. Writes need an active admin through `SECURITY DEFINER` helpers, and a user with a verified factor needs an AAL2 session for any admin read or write, in the tables and in the image bucket (restrictive policies, so a stolen password alone cannot reach the data API); the public key reads published rows only. The MFA recovery-code table has no policy at all (server only), and the audit log is readable by super admins only and written only by the server.
 
 Around those layers:
 
 - **Invite-only accounts.** No public sign-up; invites send a magic link to a set-your-own-password page. No password is ever emailed.
 - **Two-factor.** TOTP is mandatory after a grace window. Ten recovery codes, each 12 characters from a 32-letter alphabet, are generated with a cryptographic random source, stored as bcrypt hashes and single-use. Using one removes the user's factors and forces a fresh enrollment.
-- **Audit log.** Sign-ins, content changes and every permission change write an append-only row with who, what, when and the request's IP.
-- **Uploads.** Only active admins can write to the image bucket (Storage RLS). The bucket enforces a 5 MB limit and a JPEG, PNG, WebP and GIF allow-list server-side; SVG is excluded on purpose. File names are random, and the extension comes from the checked type, never the uploaded name.
+- **Audit log.** Sign-ins, content changes and every permission change write an append-only row with who, what, when and the client IP as reported by the request's headers. Only the header your host or edge sets is trustworthy (`cf-connecting-ip` behind Cloudflare); behind anything else, a client can send that header itself.
+- **Uploads.** Only active admins can write to the image bucket (Storage RLS). The bucket enforces a 5 MB limit server-side and accepts only uploads declared as JPEG, PNG, WebP or GIF; SVG is excluded on purpose. The type is the one the client declares, not a check of the file's bytes. File names are random, and the extension comes from the checked type, never the uploaded name.
 - **Secrets.** The service-role (or secret) key is used only in server modules; `server.ts` imports `server-only` so a client import fails the build.
 
 ## Known limitations
