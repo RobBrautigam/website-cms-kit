@@ -13,6 +13,7 @@ import { getAdminRoleOrNull } from '@/lib/auth/require'
 import { mapPost } from '@/lib/data'
 import type { BlogPost, BlogPostStagedChange } from '@/lib/supabase/types'
 import { STAGED_CONTENT_FIELDS } from './rules'
+import { STAGED_BUCKET, imagePathsIn, withSignedImages } from './images'
 
 async function previewClient() {
   const { isEnabled } = await draftMode()
@@ -35,6 +36,22 @@ function overlay(post: BlogPost, stage: BlogPostStagedChange): BlogPost {
 }
 
 type StageWithPost = BlogPostStagedChange & { post: BlogPost | null }
+type PreviewClient = NonNullable<Awaited<ReturnType<typeof previewClient>>>
+
+/**
+ * Staged posts point at images that are not public yet (lib/staging/images.ts).
+ * Swap those for signed links, signed with the admin's own session so the
+ * staged bucket's policies decide. Images that are public already, or that
+ * cannot be signed, keep their URL.
+ */
+async function withStagedImages(supabase: PreviewClient, posts: BlogPost[]): Promise<BlogPost[]> {
+  const paths = Array.from(new Set(posts.flatMap((p) => imagePathsIn(p))))
+  if (paths.length === 0) return posts
+  const { data } = await supabase.storage.from(STAGED_BUCKET).createSignedUrls(paths, 600)
+  const signed: Record<string, string> = {}
+  for (const row of data ?? []) if (row.path && row.signedUrl && !row.error) signed[row.path] = row.signedUrl
+  return posts.map((p) => withSignedImages(p, signed))
+}
 
 /**
  * One post as it will be once its staged change is published, looked up by
@@ -69,7 +86,8 @@ export async function getPreviewPost(slug: string) {
     stage = (byStagedSlug.data?.[0] as StageWithPost | undefined) ?? null
   }
   if (!stage?.post) return null
-  return { ...mapPost(overlay(stage.post, stage)), staged: true as const }
+  const [post] = await withStagedImages(supabase, [overlay(stage.post, stage)])
+  return { ...mapPost(post), staged: true as const }
 }
 
 /**
@@ -97,5 +115,6 @@ export async function getPreviewPosts() {
     if (stage.post) rows.push({ post: overlay(stage.post, stage), staged: true })
   }
   rows.sort((a, b) => (b.post.published_at ?? '').localeCompare(a.post.published_at ?? ''))
-  return rows.map(({ post, staged }) => ({ ...mapPost(post), staged }))
+  const posts = await withStagedImages(supabase, rows.map((r) => r.post))
+  return rows.map(({ staged }, i) => ({ ...mapPost(posts[i]), staged }))
 }

@@ -150,3 +150,31 @@ test('the redirect beacon counts through the limited function on the service rol
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
   }
 })
+
+// Private staged images: publishing copies each one to the public bucket.
+const IMG = (path) => `https://proj.supabase.example/storage/v1/object/public/blog-images/${path}`
+const A = 'blog/0a1b2c3d4e5f.png'
+const B = 'blog/11112222-3333-4444-5555-666677778888.webp'
+
+test('going live makes the post\'s staged images public and clears the staged copies', async () => {
+  const { promoteImages } = await import('../../lib/staging/promote-images.ts')
+  fakes.storage.staged.add(A)
+  fakes.storage.staged.add(B)
+  const failed = await promoteImages({
+    featured_image_url: IMG(A),
+    body: { type: 'doc', content: [{ type: 'image', attrs: { src: IMG(B), alt: 'x' } }] },
+  })
+  assert.equal(failed, null)
+  assert.deepEqual([...fakes.storage.public].sort(), [A, B].sort())
+  assert.equal(fakes.storage.staged.size, 0)
+})
+
+test('an image already public (or from before 1.3.0) is skipped; a real storage failure stops the publish', async () => {
+  const { promoteImages } = await import('../../lib/staging/promote-images.ts')
+  fakes.storage.public.add(A)
+  assert.equal(await promoteImages({ featured_image_url: IMG(A) }), null)
+  fakes.storage.staged.add(B)
+  fakes.storage.failCopy = 'Service unavailable'
+  assert.match(await promoteImages({ featured_image_url: IMG(B) }), /could not be made public/)
+  assert.equal(fakes.storage.public.has(B), false)
+})

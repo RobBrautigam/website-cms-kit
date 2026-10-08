@@ -7,7 +7,8 @@ import { Search, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import RowDeleteButton from './RowDeleteButton'
 import ToggleButton from './ToggleButton'
-import { deletePost, togglePostStatus, duplicatePost } from '@/app/(admin)/admin/posts/actions'
+import { bulkPostAction, deletePost, togglePostStatus, duplicatePost } from '@/app/(admin)/admin/posts/actions'
+import type { BulkAction } from '@/lib/admin/bulk'
 import { reviewLabel, type ReviewStatus } from '@/lib/staging/rules'
 
 // Keep in sync with the categories in PostMetaSidebar.
@@ -45,6 +46,9 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  // Bulk actions: the picked rows (only rows the filters show can be picked).
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -54,6 +58,39 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
       return true
     })
   }, [posts, searchQuery, statusFilter, categoryFilter])
+
+  const visiblePicked = filteredPosts.filter((p) => picked.has(p.id)).map((p) => p.id)
+  const allPicked = filteredPosts.length > 0 && visiblePicked.length === filteredPosts.length
+
+  function togglePick(id: string) {
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function togglePickAll() {
+    setPicked(allPicked ? new Set() : new Set(filteredPosts.map((p) => p.id)))
+  }
+
+  async function runBulk(action: BulkAction) {
+    if (visiblePicked.length === 0) return
+    const n = visiblePicked.length
+    if (action === 'delete' && !window.confirm(`Delete ${n} post${n === 1 ? '' : 's'}? This cannot be undone.`)) return
+    setBulkBusy(true)
+    const result = await bulkPostAction(action, visiblePicked)
+    setBulkBusy(false)
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+    if (result.data!.skipped > 0) toast.warning(result.data!.summary)
+    else toast.success(result.data!.summary)
+    setPicked(new Set())
+    router.refresh()
+  }
 
   function handleDuplicate(post: PostRow) {
     setDuplicating(post.id)
@@ -141,11 +178,25 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
         </p>
       )}
 
+      {/* Bulk actions: shown once a row is picked */}
+      {visiblePicked.length > 0 && (
+        <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-bg-white px-4 py-2.5 shadow-sm" role="region" aria-label="Bulk actions">
+          <span className="text-sm font-semibold text-text-primary mr-2">{visiblePicked.length} selected</span>
+          <button type="button" disabled={bulkBusy} onClick={() => void runBulk('publish')} className="px-3 py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover disabled:opacity-50">Publish</button>
+          <button type="button" disabled={bulkBusy} onClick={() => void runBulk('unpublish')} className="px-3 py-1.5 rounded-lg border border-border text-text-primary text-sm font-medium hover:bg-bg-card disabled:opacity-50">Unpublish</button>
+          <button type="button" disabled={bulkBusy} onClick={() => void runBulk('delete')} className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50">Delete</button>
+          <button type="button" disabled={bulkBusy} onClick={() => setPicked(new Set())} className="ml-auto text-sm text-text-secondary hover:underline">Clear</button>
+        </div>
+      )}
+
       {/* Desktop table */}
       <div className="hidden md:block border border-border rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-bg-card border-b border-border">
+              <th className="w-10 pl-5 py-3">
+                <input type="checkbox" checked={allPicked} onChange={togglePickAll} aria-label="Select all shown posts" className="h-4 w-4 accent-[var(--accent)]" />
+              </th>
               <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-5 py-3">Title</th>
               <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-5 py-3">Author</th>
               <th className="text-left text-xs font-semibold text-text-secondary uppercase tracking-wider px-5 py-3">Status</th>
@@ -156,6 +207,9 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
           <tbody>
             {filteredPosts.map((post) => (
               <tr key={post.id} className="border-b border-border last:border-0 hover:bg-bg-card/50 transition-colors">
+                <td className="pl-5 py-4 align-top">
+                  <input type="checkbox" checked={picked.has(post.id)} onChange={() => togglePick(post.id)} aria-label={`Select ${post.title}`} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+                </td>
                 <td className="px-5 py-4">
                   <Link href={`/admin/posts/${post.id}/edit`} className="font-semibold text-text-primary hover:text-accent transition-colors">
                     {post.title}
@@ -244,12 +298,15 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
             : '—'
           return (
             <li key={post.id} className="border border-border rounded-lg bg-bg-white p-4">
-              <Link
-                href={`/admin/posts/${post.id}/edit`}
-                className="block font-semibold text-text-primary hover:text-accent transition-colors"
-              >
-                {post.title}
-              </Link>
+              <div className="flex items-start gap-3">
+                <input type="checkbox" checked={picked.has(post.id)} onChange={() => togglePick(post.id)} aria-label={`Select ${post.title}`} className="mt-1 h-5 w-5 shrink-0 accent-[var(--accent)]" />
+                <Link
+                  href={`/admin/posts/${post.id}/edit`}
+                  className="block font-semibold text-text-primary hover:text-accent transition-colors"
+                >
+                  {post.title}
+                </Link>
+              </div>
               <p className="text-xs text-text-secondary mt-0.5">/{post.slug}</p>
                   <StagedBadge status={post.staged} />
 

@@ -33,7 +33,9 @@ export interface StagingActions {
 
 /**
  * Must match public.staging_review_required() in migration 001. Turning on
- * mandatory review means changing both, and hiding "Publish now".
+ * mandatory review means changing both, and hiding "Publish now". With the
+ * database switch on, migration 002's two-person lock makes it real: a live
+ * post then changes only through an approved staged change.
  */
 export const REVIEW_REQUIRED = false
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PostEditor from './PostEditor'
@@ -8,7 +8,9 @@ import PostMetaSidebar from './PostMetaSidebar'
 import type { PostMeta } from './PostMetaSidebar'
 import TipTapRenderer from '@/components/TipTapRenderer'
 import Link from 'next/link'
-import { publishNow, stageChanges } from '@/app/(admin)/admin/staging/actions'
+import { prepareToGoLive, publishNow, stageChanges } from '@/app/(admin)/admin/staging/actions'
+import { altTextRefusal } from '@/lib/admin/alt-text'
+import { AUTOSAVE_DELAY_MS, autosaveLabel, autosaveTarget, isDirty, snapshot } from '@/lib/admin/autosave'
 import { reviewLabel, type ReviewStatus } from '@/lib/staging/rules'
 
 const DEFAULT_AUTHOR_SLUG = 'jane-doe'
@@ -66,6 +68,77 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     authorSlug: initialData?.authorSlug || DEFAULT_AUTHOR_SLUG,
   })
 
+  // The editable content, in the database's field names. Status and the
+  // publish date are not content: an autosave never changes them.
+  const contentOf = useCallback(
+    (m: PostMeta, b: Record<string, unknown>) => ({
+      title: m.title,
+      slug: m.slug,
+      excerpt: m.excerpt,
+      meta_description: m.metaDescription,
+      categories: m.categories,
+      featured_image_url: m.featuredImageUrl,
+      featured_image_alt: m.featuredImageAlt,
+      body: b,
+      author_slug: m.authorSlug || DEFAULT_AUTHOR_SLUG,
+    }),
+    []
+  )
+
+  // Unsaved changes and server autosave (lib/admin/autosave.ts): a draft
+  // saves to its own row, a live post to its staged copy, a new post stays in
+  // this browser until the first save.
+  const target = autosaveTarget({ postId: initialData?.id, isLive, stagedReviewStatus: staged?.reviewStatus ?? null })
+  const [savedSnapshot, setSavedSnapshot] = useState(() => snapshot(contentOf(meta, body)))
+  const [autosaving, setAutosaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
+  const [autosaveError, setAutosaveError] = useState<string | null>(null)
+  // A status or date change is unsaved too, but only Save writes it.
+  const [savedSchedule] = useState(() => `${meta.status}|${meta.publishedAt}`)
+  const contentDirty = isDirty(savedSnapshot, contentOf(meta, body))
+  const dirty = contentDirty || `${meta.status}|${meta.publishedAt}` !== savedSchedule
+  const leaving = useRef(false)
+
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => {
+      if (leaving.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  useEffect(() => {
+    if (!contentDirty || saving || autosaving || (target !== 'draft' && target !== 'staged')) return
+    if (!meta.title.trim() || !meta.slug.trim()) return
+    const timer = setTimeout(async () => {
+      const content = contentOf(meta, body)
+      setAutosaving(true)
+      let error: string | null = null
+      if (target === 'draft') {
+        const result = await supabase.from('blog_posts').update(content).eq('id', initialData!.id!)
+        error = result.error?.message ?? null
+      } else {
+        const result = await stageChanges(initialData!.id!, content)
+        error = result.ok ? null : result.error
+      }
+      setAutosaving(false)
+      setAutosaveError(error)
+      if (!error) {
+        setSavedSnapshot(snapshot(content))
+        setSavedAt(new Date())
+      }
+    }, AUTOSAVE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [contentDirty, saving, autosaving, target, meta, body, contentOf, supabase, initialData])
+
+  function confirmLeave(): boolean {
+    if (!dirty) return true
+    return window.confirm('You have unsaved changes. Leave without saving them?')
+  }
+
   // Check for saved draft on mount.
   // The setState calls below are flagged by react-hooks/set-state-in-effect, but
   // localStorage is a browser-only API that returns null during SSR. Reading it
@@ -113,6 +186,15 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
 
     setSaving(true)
 
+    // Going live (now or on a schedule): alt text first, then the post's
+    // private staged images go public (lib/staging/images.ts).
+    if (meta.status !== 'draft') {
+      const missing = altTextRefusal({ featuredImageUrl: meta.featuredImageUrl, featuredImageAlt: meta.featuredImageAlt, body })
+      if (missing) { alert(missing); setSaving(false); return }
+      const ready = await prepareToGoLive({ featured_image_url: meta.featuredImageUrl, featured_image_alt: meta.featuredImageAlt, body })
+      if (!ready.ok) { alert(ready.error); setSaving(false); return }
+    }
+
     const postData: Record<string, unknown> = {
       title: meta.title,
       slug: meta.slug,
@@ -156,6 +238,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
 
     // Clear auto-saved draft
     localStorage.removeItem(storageKey)
+    leaving.current = true
 
     await fetch('/api/revalidate', { method: 'POST' })
     router.push('/admin/posts')
@@ -167,18 +250,13 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     if (!meta.title.trim()) { alert('Title is required'); return }
     if (!meta.slug.trim()) { alert('Slug is required'); return }
 
-    setSaving(true)
-    const content = {
-      title: meta.title,
-      slug: meta.slug,
-      excerpt: meta.excerpt,
-      meta_description: meta.metaDescription,
-      categories: meta.categories,
-      featured_image_url: meta.featuredImageUrl,
-      featured_image_alt: meta.featuredImageAlt,
-      body,
-      author_slug: meta.authorSlug || DEFAULT_AUTHOR_SLUG,
+    if (andPublish) {
+      const missing = altTextRefusal({ featuredImageUrl: meta.featuredImageUrl, featuredImageAlt: meta.featuredImageAlt, body })
+      if (missing) { alert(missing); return }
     }
+
+    setSaving(true)
+    const content = contentOf(meta, body)
     const result = andPublish
       ? await publishNow(initialData.id, content)
       : await stageChanges(initialData.id, content)
@@ -191,6 +269,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     }
 
     localStorage.removeItem(storageKey)
+    leaving.current = true
     router.push(andPublish ? '/admin/posts' : '/admin/staging')
     router.refresh()
   }
@@ -234,9 +313,11 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
           <h1 className="text-xl font-black" style={{ fontFamily: 'var(--font-display)' }}>
             {isEditing ? 'EDIT POST' : 'NEW POST'}
           </h1>
-          {autoSaved && (
-            <span className="text-xs text-text-secondary/60 animate-pulse">Auto-saved</span>
-          )}
+          <span className="text-xs text-text-secondary" role="status" aria-live="polite" data-autosave={target}>
+            {autoSaved && target === 'browser'
+              ? 'Kept in this browser'
+              : autosaveLabel({ target, dirty, saving: autosaving, savedAt, error: autosaveError })}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -254,7 +335,11 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
             Preview
           </button>
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (!confirmLeave()) return
+              leaving.current = true
+              router.back()
+            }}
             className="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-bg-card transition-colors"
           >
             Cancel

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/require'
 import { IMAGE_TYPES, MAX_IMAGE_BYTES, newImagePath } from '@/lib/admin/upload-image'
+import { PUBLIC_BUCKET, STAGED_BUCKET } from '@/lib/staging/images'
 import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 // An optional server-side upload path: nothing in the kit calls it (the
@@ -40,8 +41,9 @@ export async function POST(request: NextRequest) {
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
 
+  // Private until the post goes live (lib/staging/images.ts).
   const { error } = await supabase.storage
-    .from('blog-images')
+    .from(STAGED_BUCKET)
     .upload(filePath, buffer, {
       contentType: file.type,
       cacheControl: '31536000',
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: { publicUrl } } = supabase.storage
-    .from('blog-images')
+    .from(PUBLIC_BUCKET)
     .getPublicUrl(filePath)
 
   return NextResponse.json({ url: publicUrl })

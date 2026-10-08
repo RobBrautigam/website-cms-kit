@@ -1,6 +1,11 @@
 'use client'
 
 import ImageUploader from './ImageUploader'
+import AdminImage from './AdminImage'
+import { searchPreview, socialPreview } from '@/lib/admin/previews'
+
+// The public site's address for the previews (docs/09). A placeholder until set.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.example.com'
 
 // Replace these with your own categories + authors. In the reference app the
 // author list came from a shared team module; here it is a static placeholder
@@ -134,17 +139,24 @@ export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: Po
         onUpload={(url) => update({ featuredImageUrl: url })}
       />
 
-      {/* Image Alt */}
+      {/* Image Alt: required before the post goes live (lib/admin/alt-text.ts) */}
       {meta.featuredImageUrl && (
         <div>
-          <label className="block text-sm font-semibold text-text-secondary mb-1.5">Image Alt Text</label>
+          <label htmlFor="featured_image_alt" className="block text-sm font-semibold text-text-secondary mb-1.5">
+            Image Alt Text <span className="font-normal text-text-secondary/70">(required to publish)</span>
+          </label>
           <input
+            id="featured_image_alt"
             type="text"
             value={meta.featuredImageAlt}
             onChange={(e) => update({ featuredImageAlt: e.target.value })}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition"
+            aria-invalid={!meta.featuredImageAlt.trim()}
+            className={`w-full px-3 py-2.5 rounded-lg border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition ${meta.featuredImageAlt.trim() ? 'border-border' : 'border-amber-500'}`}
             placeholder="Describe the image"
           />
+          {!meta.featuredImageAlt.trim() && (
+            <p className="text-xs text-amber-700 mt-1.5">Say what the image shows. Screen readers read this, and it shows if the image fails to load.</p>
+          )}
         </div>
       )}
 
@@ -178,24 +190,7 @@ export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: Po
         />
       </div>
 
-      {/* SEO Preview — uses Google's actual SERP link colors (green URL, blue
-          title) so you can preview how the post will look in search results.
-          These green/blue values intentionally do NOT use the brand palette;
-          they mirror Google's own SERP colors for fidelity. */}
-      <div>
-        <label className="block text-sm font-semibold text-text-secondary mb-1.5">Search Preview</label>
-        <div className="rounded-lg border border-border bg-white p-4 space-y-1">
-          <p className="text-[13px] text-green-700 truncate">
-            example.com &rsaquo; blog &rsaquo; {meta.slug || 'your-post-slug'}
-          </p>
-          <p className="text-[17px] text-blue-800 font-medium leading-snug line-clamp-1">
-            {meta.title || 'Post Title'} | Acme
-          </p>
-          <p className="text-[13px] text-gray-600 line-clamp-2 leading-relaxed">
-            {meta.metaDescription || meta.excerpt || 'Add a meta description to see how this post will appear in search results.'}
-          </p>
-        </div>
-      </div>
+      <PostPreviews meta={meta} />
 
       {/* Status */}
       <div>
@@ -225,6 +220,58 @@ export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: Po
             className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition"
           />
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * How the post will look in a search result and as a social share card,
+ * from lib/admin/previews.ts. The search card keeps search engines' own link
+ * colors (green address, blue title), not the brand palette, for fidelity.
+ */
+function PostPreviews({ meta }: { meta: PostMeta }) {
+  const input = {
+    title: meta.title,
+    slug: meta.slug,
+    excerpt: meta.excerpt,
+    metaDescription: meta.metaDescription,
+    featuredImageUrl: meta.featuredImageUrl,
+    featuredImageAlt: meta.featuredImageAlt,
+    siteUrl: SITE_URL,
+  }
+  const search = searchPreview(input)
+  const social = socialPreview(input)
+  const warnings = [...search.warnings, ...social.warnings]
+  return (
+    <div className="space-y-3">
+      <p className="block text-sm font-semibold text-text-secondary">Search Preview</p>
+      <div className="rounded-lg border border-border bg-white p-4 space-y-1" data-preview="search">
+        <p className="text-[13px] text-green-700 truncate">{search.breadcrumb}</p>
+        <p className="text-[17px] text-blue-800 font-medium leading-snug">{search.title}</p>
+        <p className="text-[13px] text-gray-600 leading-relaxed">
+          {search.description || 'Search engines will pick their own text from the post.'}
+        </p>
+      </div>
+      <p className="block text-sm font-semibold text-text-secondary pt-1">Social Preview</p>
+      <div className="rounded-lg border border-border bg-bg-white overflow-hidden" data-preview="social">
+        {social.image ? (
+          <AdminImage src={social.image} alt={social.imageAlt} className="w-full aspect-[1.91/1] object-cover" />
+        ) : (
+          <div className="w-full aspect-[1.91/1] bg-bg-card flex items-center justify-center text-xs text-text-secondary">No image</div>
+        )}
+        <div className="p-3 space-y-0.5 border-t border-border">
+          <p className="text-[11px] tracking-wide text-text-secondary">{social.domain}</p>
+          <p className="text-sm font-semibold text-text-primary leading-snug">{social.title}</p>
+          {social.description && <p className="text-xs text-text-secondary line-clamp-2">{social.description}</p>}
+        </div>
+      </div>
+      {warnings.length > 0 && (
+        <ul className="text-xs text-amber-700 space-y-1 list-disc pl-4">
+          {warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
       )}
     </div>
   )

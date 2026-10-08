@@ -13,6 +13,8 @@ export const fakes = {
   aiAllowed: true,
   /** The model's text reply. */
   modelText: '[]',
+  /** Two in-memory buckets for the storage stand-in. */
+  storage: { staged: new Set(), public: new Set(), failCopy: null },
 }
 
 export function resetStubs() {
@@ -23,4 +25,5 @@ export function resetStubs() {
   calls.passwords = []
   fakes.aiAllowed = true
   fakes.modelText = '[]'
+  fakes.storage = { staged: new Set(), public: new Set(), failCopy: null }
 }
