@@ -36,7 +36,7 @@ function resolveAuthor(_slug: string | null | undefined): Author | null {
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function mapPost(row: BlogPost) {
+export function mapPost(row: BlogPost) {
   const author = resolveAuthor(row.author_slug)
   return {
     _id: row.id,

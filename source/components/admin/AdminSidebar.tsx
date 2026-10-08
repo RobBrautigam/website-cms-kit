@@ -33,6 +33,7 @@ const navSections: NavSection[] = [
     title: 'Content',
     items: [
       { href: '/admin/posts', label: 'Posts', icon: '📝' },
+      { href: '/admin/staging', label: 'Staging', icon: '🧪' },
       { href: '/admin/jobs', label: 'Jobs', icon: '💼' },
       { href: '/admin/testimonials', label: 'Testimonials', icon: '💬' },
     ],
