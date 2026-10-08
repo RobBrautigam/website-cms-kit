@@ -14,7 +14,7 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 
 | Posts | Editor |
 |---|---|
-| [![Posts list with search, filters, status chips and Staged badges](demo/screenshots/posts-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/posts) | [![Rich-text editor with a publishing panel showing a change in review](demo/screenshots/editor-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/posts) |
+| [![Posts list with two posts picked and the bulk bar: Publish, Unpublish, Delete](demo/screenshots/posts-bulk-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/posts) | [![Rich-text editor with strike, code, code block and divider buttons, an Alt text button, and a required alt text field on the featured image](demo/screenshots/editor-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/posts) |
 | **Staging** | **Live and staged, side by side** |
 | [![Staging page: staged changes with review states, Request review, Approve, Discard and Publish selected](demo/screenshots/staging-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) | [![The live post and its staged copy next to each other](demo/screenshots/staging-compare-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) |
 | **Audit log** | **Dark theme** |
@@ -23,11 +23,12 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 ### A five-minute walkthrough
 
 1. **Sign in.** Press Sign in, then enter `123456`. The two-factor step also offers a recovery code; using one turns two-factor off and makes you set it up again, as the real kit does.
-2. **Edit a live post.** Open "Release notes: faster image uploads and alt text reminders", change a heading, add a link, insert an image. The live site keeps the published version; your edit is a staged change. "Saved in this browser" shows autosave working.
+2. **Edit a live post.** Open "Release notes: faster image uploads and alt text reminders", change a heading, add a link, insert an image (it asks for alt text). The live site keeps the published version; your edit is a staged change. The status line reads "Unsaved changes" until autosave lands, and the sidebar shows the post as a search result and a share card.
 3. **Ask for a review.** Press Request review. Nobody approves their own change, so the demo offers "Demo: approve as" a teammate. Another post, "How we review a post before it goes live", is waiting for your approval.
 4. **Preview and publish.** Open Staging, press Compare to see live and staged side by side, flip the whole site between Live site and Staging, then tick the changes you want and press Publish selected. A change still in review cannot be published.
-5. **Team and audit.** Invite someone, change a role, try to demote the last super admin (refused), then find every step in the Audit log and export it.
-6. **Start over.** "Reset demo data" in the sidebar puts everything back.
+5. **Bulk and settings.** Tick a few posts on the Posts page and publish or unpublish them together: each one is applied or skipped with its reason. In Settings, making new recovery codes asks for your password first.
+6. **Team and audit.** Invite someone, change a role, try to demote the last super admin (refused), then find every step in the Audit log and export it.
+7. **Start over.** "Reset demo data" in the sidebar puts everything back.
 
 ## What you get
 
@@ -35,10 +36,12 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 - **Role-based authorization.** `super_admin` and `admin` roles, soft deactivation, and hardened Postgres RLS using `SECURITY DEFINER` helper functions (the recursion-free Supabase pattern).
 - **Team management.** Invite, change role, deactivate and reactivate, operator-initiated password recovery, and a "cannot remove the last super admin" guard.
 - **Staging and approval.** Edits to a live post wait in a private staged copy until someone publishes them; ask a teammate to review, approve (never your own change), compare live and staged, preview the whole site with every staged change, and publish the ones you pick together. See [below](#staging-and-approval).
-- **Audit log.** An append-only record of every sensitive change, with a filterable viewer and CSV export.
-- **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, local autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
+- **Audit log.** An append-only record of every sensitive change (a database trigger refuses edits and deletes), with a filterable viewer and CSV export.
+- **Hardened by default (1.3.0).** Security headers and a report-only Content Security Policy, one same-site check on every state-changing route, per-admin limits and output schemas on the AI routes, a server-only redirect counter, new recovery codes behind the password, private images until publish, and an opt-in database lock for real two-person control. See [docs/11](docs/11-hardening-and-everyday-comforts.md).
+- **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post.
+- **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
 - **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system you re-theme in one file, and Supabase Storage image upload guarded by Storage RLS.
-- **Two SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, then staging and approval. Both are tested on an in-memory Postgres, no Supabase project needed.
+- **Three SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, staging and approval, then hardening. All three are tested on an in-memory Postgres, no Supabase project needed.
 
 ## How a request is checked
 
@@ -81,16 +84,16 @@ flowchart LR
 
 - **A copy, never an overwrite.** One staged copy per post, in its own table. A brand-new draft can be staged too, so it goes through the same review.
 - **Two people for an approval.** Nobody approves their own change, and editing an approved change sends it back to staged. The database enforces this with a trigger, whatever client writes the row. A change in review cannot be published while it stays in review; any admin can withdraw the request, and the audit log records who did.
-- **Review is optional by default.** Any admin can still publish a staged change straight away. One switch in the migration and one constant make the staging screens publish approved changes only; they do not lock the editor's direct draft saves or the Data API, so real two-person control needs those locked too ([docs/10](docs/10-staging-and-approval.md)).
+- **Review is optional by default.** Any admin can still publish a staged change straight away. One switch in the migration and one constant make review mandatory; since 1.3.0 the same switch also turns on a database lock, so nothing reaches the public site, through the screens or the Data API, without a second admin's approval ([docs/11](docs/11-hardening-and-everyday-comforts.md#the-opt-in-two-person-lock)).
 - **Publish the ones you pick.** The Staging page publishes a selection in one transaction: all of them or none.
-- **The public site cannot read a staged row.** The public key has no grant and no policy on the table, and the public data layer never queries it. The preview reads staged rows only for a signed-in admin, through Next.js draft mode turned on by a form posted from the admin. (Images uploaded for a staged change are public by their random URL from the moment of upload.)
+- **The public site cannot read a staged row.** The public key has no grant and no policy on the table, and the public data layer never queries it. The preview reads staged rows only for a signed-in admin, through Next.js draft mode turned on by a form posted from the admin. Images uploaded while editing stay in a private bucket until their post goes live.
 - **Every step is in the audit log:** staged, review requested, approved, withdrawn, discarded, published, and preview turned on.
 
 The full model, the roles table and the tests: [docs/10-staging-and-approval.md](docs/10-staging-and-approval.md).
 
 ## Tests
 
-The database rules and the staging rules are tested on PGlite, Postgres compiled to WebAssembly, so no Supabase project or Docker is needed (Node 22.18 or later):
+The database rules, the staging rules, the route handlers and the hardening helpers are tested on PGlite and Node's test runner, Postgres compiled to WebAssembly, so no Supabase project or Docker is needed (Node 22.18 or later):
 
 ```bash
 cd source/supabase/tests
@@ -98,7 +101,7 @@ npm install
 npm test
 ```
 
-The tests load both migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session.
+The tests load all three migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits and schemas, the redirect counter and image promotion. 130 tests in all.
 
 ## 60-second tour
 
@@ -133,6 +136,7 @@ website-cms-kit/
 | [08-security-checklist.md](docs/08-security-checklist.md) | The non-negotiables before you go live: secrets, RLS, gates, Storage, headers, rate limits. |
 | [09-environment-and-deploy.md](docs/09-environment-and-deploy.md) | Env vars (both Supabase key generations), Supabase config, dependency classification, deploy. |
 | [10-staging-and-approval.md](docs/10-staging-and-approval.md) | Staged copies of live posts, review and approval, the whole-site preview, publish-selected, and the tests. |
+| [11-hardening-and-everyday-comforts.md](docs/11-hardening-and-everyday-comforts.md) | 1.3.0: headers and CSP, the same-site check, rate limits, AI output schemas, the append-only audit trigger, the two-person lock, private staged images, and the editor and posts-list comforts. |
 
 ## Tech stack
 
@@ -140,7 +144,7 @@ website-cms-kit/
 - Supabase: Postgres, Auth and Storage, through `@supabase/ssr` 0.10 or later
 - Tailwind CSS v4
 - TipTap 3 (rich text)
-- zod, react-hook-form, sonner, lucide-react, bcryptjs, server-only
+- zod (also the AI routes' output schemas), react-hook-form, sonner, lucide-react, bcryptjs, server-only
 - Optional: `@anthropic-ai/sdk` for AI drafting
 - Tests: Node's built-in test runner and PGlite 0.5.8 (Postgres 18 in WebAssembly)
 

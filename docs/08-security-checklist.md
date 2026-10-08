@@ -48,35 +48,16 @@ The non-negotiables. Most of these are easy to get subtly wrong and expensive to
 
 ## Security headers
 
-The kit ships no response headers of its own, so add them in your app's `next.config.ts`. A safe starting set for the admin:
+Since 1.3.0 the kit ships them: `source/next.config.ts` sends a fixed set on every response (HSTS, `nosniff`, a referrer policy, `X-Frame-Options: DENY`, a permissions policy, `Cross-Origin-Opener-Policy`), and `proxy.ts` adds a Content Security Policy with a fresh nonce on every request, report-only on the admin by default. The full list, the policy and its three switches are in [docs/11](11-hardening-and-everyday-comforts.md#security-headers-and-the-content-security-policy).
 
-```ts
-// next.config.ts
-const adminHeaders = [
-  { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-]
-
-export default {
-  async headers() {
-    return [
-      { source: '/admin/:path*', headers: adminHeaders },
-      { source: '/api/admin/:path*', headers: adminHeaders },
-    ]
-  },
-}
-```
-
-- [ ] **Add a Content Security Policy next.** A strict CSP in the App Router needs a per-request nonce set in the proxy (see the Next.js "Content Security Policy" guide). Start it in `Content-Security-Policy-Report-Only` mode, watch the reports, then enforce. TipTap injects a small style tag by default; pass `injectCSS: false` to the editor and ship its base CSS in your stylesheet if your `style-src` has no `'unsafe-inline'`. The interactive demo in `demo/app/` runs under a strict CSP this way (no inline script, no inline style).
-- [ ] **Only send HSTS once HTTPS works everywhere on the domain**, subdomains included, or drop `includeSubDomains` and `preload`.
+- [ ] **Merge `next.config.ts` into yours** if your app already has one, so the headers actually ship.
+- [ ] **Watch the CSP reports, then enforce.** Set `CSP_REPORT_URI` to collect them; once the admin reports nothing unexpected, set `CSP_MODE=enforce`. `CSP_SCOPE=site` extends the policy to the public pages (read docs/11 first: statically rendered pages carry no nonce). The interactive demo in `demo/app/` runs under a strict enforced CSP (no inline script, no inline style).
+- [ ] **Only send HSTS once HTTPS works everywhere on the domain**, subdomains included, or drop `includeSubDomains` and `preload` in `lib/security/headers.ts`.
 
 ## Rate limits
 
 - [ ] **Keep Supabase Auth's built-in limits on** (Dashboard -> Authentication -> Rate Limits): sign-in attempts, token refreshes, TOTP verification and emails sent. They are the brute-force protection for the login and two-factor screens.
-- [ ] **Limit the routes that cost money or accept anonymous traffic.** The optional `/api/ai/*` routes call a paid model, and `increment_redirect_hit` is callable by `anon` (anyone can bump a redirect's visit counter, so treat those counts as approximate analytics, never as security data). Put a per-IP limit in front of both (your host's edge rules, or a small token bucket in the proxy backed by a shared store).
+- [ ] **Run migration 002 for the app's own limits.** The `/api/ai/*` routes share a budget per admin (20 calls in 10 minutes by default) and refuse when the limiter is down; the redirect counter is counted by the server only, per visitor and per redirect, and the public key can no longer bump it. Both live in the database ([docs/11](11-hardening-and-everyday-comforts.md#per-caller-limits)). Treat redirect counts as analytics, never as security data, and make sure the address header your host sets is the one `clientAddress()` reads.
 - [ ] **Know what covers the recovery-code screen.** Recovery codes are checked by the app, not by Supabase Auth, so Auth's TOTP limit does not apply to them. They hold up anyway: each is 12 characters from a 32-letter alphabet (60 bits), bcrypt-hashed and single-use, and the screen is only reachable with a correct password. A per-user attempt limit on `/api/admin/mfa/verify` is still a cheap extra.
 
 ## Before you go live
@@ -86,5 +67,7 @@ export default {
 - [ ] Confirm a leaked-anon-key write attempt fails (try `supabase.from('blog_posts').insert(...)` from the browser console while signed out - it must be rejected by RLS).
 - [ ] Confirm you cannot demote/deactivate the last super-admin.
 - [ ] Confirm a signed-out browser cannot read a staged change (`supabase.from('blog_post_staged_changes').select()` with the public key must fail), that your public blog pages show the live post while a staged copy exists, and that `npm test` in `source/supabase/tests` passes.
-- [ ] Confirm the preview switch refuses a request from another site: a form on another origin posting to `/api/admin/preview` must get a 403, and copying the draft-mode cookie into a signed-out browser must show the live site.
+- [ ] Confirm the preview switch refuses a request from another site: a form on another origin posting to `/api/admin/preview` must get a 403, and copying the draft-mode cookie into a signed-out browser must show the live site. Every other state-changing admin route answers a cross-site request the same way (1.3.0).
+- [ ] Confirm the headers ship: `curl -sI https://your-domain/admin/login` shows `strict-transport-security`, `x-frame-options` and a `content-security-policy-report-only` (or, once enforced, `content-security-policy`) header.
+- [ ] Confirm an image uploaded to a draft is not reachable at its public address until the post is published, and is afterwards.
 - [ ] Confirm the service-role key is absent from the client bundle (search the built JS for the key's first characters - it must not appear).

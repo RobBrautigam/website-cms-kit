@@ -2,6 +2,40 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.3.0 (2026-10-08)
+
+Hardening and everyday comforts. Run `002_hardening.sql` after 001. Full detail in [docs/11](docs/11-hardening-and-everyday-comforts.md).
+
+### Security
+
+- **Security headers ship with the kit.** A real `source/next.config.ts` sends HSTS, `nosniff`, a referrer policy, `X-Frame-Options: DENY`, a permissions policy and `Cross-Origin-Opener-Policy` on every response, and turns off `X-Powered-By`.
+- **A Content Security Policy with a per-request nonce**, set by `proxy.ts`: report-only on the admin by default, with `CSP_MODE=enforce`, `CSP_SCOPE=site` and `CSP_REPORT_URI` to switch it.
+- **One same-site check on every state-changing route.** The 17 older cookie-authorized routes (two-factor, user management, uploads, the AI routes, revalidation) now refuse a cross-site request before the auth check, through one shared helper, `lib/security/request-origin.ts`, which the preview routes use too. A test scans every route file for it.
+- **The password before new recovery codes**, checked on a throwaway client like turning two-factor off.
+- **Per-caller limits** kept in the database: the AI routes share 20 calls per admin in 10 minutes and refuse when the limiter is down; the redirect counter is counted by the server only, per visitor and per redirect, and the public key can no longer call `increment_redirect_hit`.
+- **Schemas on the AI routes' output** (zod): a reply that does not fit, including a post body with a node the site does not draw or a link or image address that could run script, is a 502, never handed to the editor. Inputs are validated too, and errors no longer echo internal details.
+- **The audit log is append-only by trigger**: updates, deletes and truncates are refused for every role, the service role included, apart from the retention cleanup and the user-deletion foreign key.
+- **The opt-in two-person lock.** With mandatory review switched on, a trigger on `blog_posts` refuses any change that puts content on the public site unless it is exactly an approved staged change, through the screens or the Data API alike.
+- **Staged images stay private until publish.** Uploads go to a private `blog-images-staged` bucket; the admin and the preview show them through short-lived signed links, and every way a post goes live copies its images to the public bucket first.
+- **Slug swaps publish in one batch**: the unique slug is deferrable, and `publish_staged_posts()` checks it at the end of the batch.
+- **StarterKit's undrawn marks are drawn.** The public renderer now draws strike, inline code, code blocks and divider lines; a test keeps the editor and the renderer on one list of nodes and marks.
+
+### Added
+
+- **Server autosave and an unsaved-changes warning.** A draft saves to its own row and a live post's edits to its staged copy a few seconds after you stop typing (paused while that copy is in review); leaving with unsaved changes asks first.
+- **Required alt text**: asked for on insert, editable from the toolbar, a required field on the featured image, and checked again by the server before anything goes live.
+- **A dark theme in the admin**: light, dark or system from the sidebar, kept in a cookie so the page never flashes.
+- **Bulk actions on the posts list**: publish, unpublish or delete several posts, each one applied or skipped with its reason.
+- **Search and share-card preview** for every post, with warnings for a long title or a missing description or image.
+- `docs/11-hardening-and-everyday-comforts.md`, and 79 more tests than 1.2.0 (130 in all, up from 51): migration 002 on PGlite, the route handlers against stand-ins for Next.js and Supabase, and the new helpers. Each was seen failing first; then each guard was broken on purpose (29 times in the migration, 25 in the code) to confirm a test catches it.
+- **Demo**: everything above that runs in a browser is live in the demo; the server-side hardening is described on the Settings page.
+
+### Changed
+
+- `lib/staging/rules.ts` no longer holds the origin helpers; they moved to `lib/security/request-origin.ts`.
+- `APP_VERSION` reads `v1.3.0` (it had stayed at `v1.0.0`).
+- SECURITY.md's known limitations: six closed, the rest restated.
+
 ## 1.2.0 (2026-10-08)
 
 ### Added

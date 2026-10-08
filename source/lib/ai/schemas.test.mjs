@@ -44,6 +44,21 @@ test('a generated post is refused for a bad slug, an unknown node, an unknown ma
   assert.equal(parseModelJson(JSON.stringify(post({ body: { type: 'paragraph', content: [] } })), GeneratedPost).ok, false)
 })
 
+test('model output carrying a script link or a script image is refused, a safe one passes', () => {
+  const linked = (href) => post({ body: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href } }] }] }]) })
+  const image = (src) => post({ body: doc([{ type: 'image', attrs: { src, alt: 'A chart' } }]) })
+  for (const bad of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x', 'vbscript:x', '//evil.example/x']) {
+    assert.equal(parseModelJson(JSON.stringify(linked(bad)), GeneratedPost).ok, false, bad)
+  }
+  for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,x', 'http://example.com/x.png']) {
+    assert.equal(parseModelJson(JSON.stringify(image(bad)), GeneratedPost).ok, false, bad)
+  }
+  for (const good of ['https://example.com/a', '/blog/a-post', '#faq', 'mailto:hi@example.com']) {
+    assert.equal(parseModelJson(JSON.stringify(linked(good)), GeneratedPost).ok, true, good)
+  }
+  assert.equal(parseModelJson(JSON.stringify(image('https://example.com/a.png')), GeneratedPost).ok, true)
+})
+
 test('inputs are capped so one request cannot buy an outsized prompt', () => {
   assert.equal(GenerateInput.safeParse({ topic: '' }).success, false)
   assert.equal(GenerateInput.safeParse({ topic: 'x'.repeat(501) }).success, false)

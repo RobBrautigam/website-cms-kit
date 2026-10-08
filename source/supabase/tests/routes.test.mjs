@@ -125,6 +125,7 @@ test('the redirect beacon counts through the limited function on the service rol
   const realFetch = globalThis.fetch
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://proj.supabase.example'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-test-value'
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-test-value'
   globalThis.fetch = async (url, init) => {
     sent.push({ url, init })
     return new Response(null, { status: 200 })
@@ -144,10 +145,16 @@ test('the redirect beacon counts through the limited function on the service rol
     assert.equal(body.redirect_id, id)
     assert.equal(body.caller_key, '203.0.113.9')
     assert.ok(body.per_caller_max > 0 && body.per_redirect_max >= body.per_caller_max)
+    // Without the service role key nothing is counted: the anon key never reaches the counter.
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    const again = new Request(`${SITE}/api/redirects/hit/${id}`, { method: 'POST' })
+    assert.equal((await POST(again, { params: Promise.resolve({ id }) })).status, 204)
+    assert.equal(sent.length, 1)
   } finally {
     globalThis.fetch = realFetch
     delete process.env.NEXT_PUBLIC_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   }
 })
 

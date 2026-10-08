@@ -31,10 +31,21 @@ export const MetaSuggestion = z.object({
   metaDescription: z.string().trim().min(1).max(320),
 })
 
-const Mark = z.object({
-  type: z.enum(RENDERED_MARKS),
-  attrs: z.record(z.string(), z.unknown()).optional(),
-})
+// A model can be talked into writing a script link (prompt injection through
+// the topic or keywords). Links may point at https, http, mail, phone, a site
+// path or an anchor; images must be https or a site path. The renderer has
+// its own allowlist; this one keeps such output out of the editor too.
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i
+const SAFE_SRC = /^(?:https:\/\/|\/(?!\/))/i
+const urlAttr = (attrs: Record<string, unknown> | undefined, key: string, pattern: RegExp) =>
+  typeof attrs?.[key] === 'string' && pattern.test(attrs[key] as string)
+
+const Mark = z
+  .object({
+    type: z.enum(RENDERED_MARKS),
+    attrs: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((m) => m.type !== 'link' || urlAttr(m.attrs, 'href', SAFE_HREF), { message: 'Unsafe link address' })
 
 type Node = {
   type: (typeof RENDERED_NODES)[number]
@@ -45,13 +56,15 @@ type Node = {
 }
 
 const NodeSchema: z.ZodType<Node> = z.lazy(() =>
-  z.object({
-    type: z.enum(RENDERED_NODES),
-    attrs: z.record(z.string(), z.unknown()).optional(),
-    content: z.array(NodeSchema).max(2000).optional(),
-    text: z.string().max(20000).optional(),
-    marks: z.array(Mark).max(10).optional(),
-  })
+  z
+    .object({
+      type: z.enum(RENDERED_NODES),
+      attrs: z.record(z.string(), z.unknown()).optional(),
+      content: z.array(NodeSchema).max(2000).optional(),
+      text: z.string().max(20000).optional(),
+      marks: z.array(Mark).max(10).optional(),
+    })
+    .refine((n) => n.type !== 'image' || urlAttr(n.attrs, 'src', SAFE_SRC), { message: 'Unsafe image address' })
 )
 
 export const TipTapDoc = z.object({

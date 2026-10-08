@@ -65,7 +65,7 @@ Every content table (`blog_posts`, `job_openings`, `testimonials`, `url_redirect
 
 So: the public sees only published rows; admins see and mutate everything; a leaked anon key can read published content (already public) but cannot write a single row.
 
-`user_roles` itself: a user may read their own row OR (if super-admin) all rows; only super-admins may write. `admin_audit_log`: super-admins may read; nobody may write through RLS (writes go through the service-role client only - append-only by construction). `admin_mfa_recovery_codes`: NO policies at all, so even the owner cannot read their own hashes except through the service-role helper.
+`user_roles` itself: a user may read their own row OR (if super-admin) all rows; only super-admins may write. `admin_audit_log`: super-admins may read; nobody may write through RLS (writes go through the service-role client only), and since migration 002 a trigger refuses every update, delete and truncate, the service role's included, apart from the retention cleanup ([docs/11](11-hardening-and-everyday-comforts.md#the-audit-log-is-append-only-by-trigger)). `admin_mfa_recovery_codes`: NO policies at all, so even the owner cannot read their own hashes except through the service-role helper.
 
 ### Private tables: staged changes
 
