@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Interactive demo of the Website CMS Kit admin: sign in with two-factor, write and publish posts, preview the whole site in staging, manage media, the team, redirects and the audit log. Sample data in your browser only.">
+<title>Acme Admin (demo)</title>
+<link rel="stylesheet" href="app.css">
+<script src="theme-init.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="demo-bar" role="region" aria-label="About this demo">
+  <span><strong>Interactive demo.</strong> Invented sample data, stored only in this browser. Nothing is sent anywhere.</span>
+  <a href="../">About the demo</a>
+  <a href="https://github.com/RobBrautigam/website-cms-kit">Source on GitHub</a>
+</div>
+<div id="root"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<noscript><p class="empty">This demo needs JavaScript. The kit's source and docs are on GitHub.</p></noscript>
+<script src="../vendor/tiptap-3.31.4.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

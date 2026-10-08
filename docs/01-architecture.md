@@ -1,4 +1,4 @@
-# 01 — Architecture
+# 01 - Architecture
 
 The mental model for the admin CMS. Read this first; the other docs drill into each layer.
 
@@ -37,7 +37,7 @@ Every protected request passes three independent gates. Each one can deny on its
                          └─────────────────────────────────────────────┘
 ```
 
-Why three and not one: the proxy is fast but coarse (it only knows "is there a session"). The server gate knows roles and MFA but trusts the app code. RLS is the last word and trusts nothing — it is enforced by Postgres regardless of what the app does. Defense in depth.
+Why three and not one: the proxy is fast but coarse (it only knows "is there a session"). The server gate knows roles and MFA but trusts the app code. RLS is the last word and trusts nothing - it is enforced by Postgres regardless of what the app does. Defense in depth.
 
 ## Request lifecycle (a page load)
 
@@ -87,7 +87,7 @@ source/
 
 ## Key conventions
 
-- **Route groups split public from protected.** Auth pages live under `app/admin/` (no shell, reachable signed-out). Everything behind the gate lives under `app/(admin)/` (the `(admin)` folder name is a Next.js route group — it does not appear in the URL).
+- **Route groups split public from protected.** Auth pages live under `app/admin/` (no shell, reachable signed-out). Everything behind the gate lives under `app/(admin)/` (the `(admin)` folder name is a Next.js route group - it does not appear in the URL).
 - **Server components fetch, client components interact.** Pages are server components that call `requireAdmin()` and query Supabase. Tables/forms are `'use client'` and talk back via server actions.
 - **Mutations are server actions returning `ActionResult`.** A single discriminated union (`source/lib/admin/action-result.ts`) gives every mutation a uniform `{ok:true}` / `{ok:false, error, code}` shape the UI can branch on.
 - **Semantic design tokens, not raw colors.** Components use classes like `bg-bg-card`, `text-text-primary`, `text-accent`. They are defined once in `source/app/globals.css`; re-theme by editing that file.

@@ -1,5 +1,8 @@
 import { requireAdmin } from "@/lib/auth/require";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  createAnonServerClient,
+  createServerSupabaseClient,
+} from "@/lib/supabase/server";
 import { deleteAllRecoveryCodes } from "@/lib/auth/mfa";
 import { recordAdminAction } from "@/lib/auth/audit";
 
@@ -20,16 +23,28 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = await createServerSupabaseClient();
-  // Re-authenticate with password before letting them disable a security factor
-  const reauth = await supabase.auth.signInWithPassword({
+  // Re-authenticate with the password before letting them disable a security
+  // factor. The check runs on a throwaway, cookie-less client: signing in on
+  // the cookie client would swap this verified (AAL2) session for a fresh
+  // AAL1 one, and Supabase refuses to unenroll a verified factor below AAL2.
+  const verifier = createAnonServerClient();
+  const reauth = await verifier.auth.signInWithPassword({
     email: user.email!,
     password,
   });
   if (reauth.error) {
     return Response.json({ error: "Wrong password" }, { status: 401 });
   }
+  // End the extra session the check created. Local scope only: a global
+  // sign-out would end the user's real session too. A failure here leaves one
+  // orphan session row (its tokens never left server memory), so log it and
+  // carry on rather than fail the user's request.
+  const { error: signOutError } = await verifier.auth.signOut({ scope: "local" });
+  if (signOutError) {
+    console.error("mfa/disable: verifier sign-out failed", signOutError.message);
+  }
 
+  const supabase = await createServerSupabaseClient();
   const { error: unenrollError } = await supabase.auth.mfa.unenroll({
     factorId: factor_id,
   });

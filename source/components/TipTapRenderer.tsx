@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Image from 'next/image'
+import { isSafeHref } from '@/lib/safe-href'
 
 interface TipTapNode {
   type: string
@@ -83,7 +84,7 @@ function renderMarks(text: string, marks?: TipTapMark[]): React.ReactNode {
         const raw = (mark.attrs?.href as string) || ''
         // Scheme allowlist: block javascript:/data:/vbscript: URIs (stored XSS).
         // Body JSON can come from model output or an import, so never trust href.
-        const href = /^(https?:|mailto:|tel:|\/|#)/i.test(raw) ? raw : '#'
+        const href = isSafeHref(raw) ? raw : '#'
         const isExternal = href.startsWith('http')
         return (
           <a

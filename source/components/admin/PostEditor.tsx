@@ -1,11 +1,12 @@
 'use client'
 
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { createClient } from '@/lib/supabase/client'
+import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
+import { isSafeHref } from '@/lib/safe-href'
 import { getWordCount } from '@/lib/utils'
 
 interface PostEditorProps {
@@ -13,7 +14,8 @@ interface PostEditorProps {
   onChange: (content: Record<string, unknown>) => void
 }
 
-function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+// Null until the editor mounts on the client (immediatelyRender: false).
+function EditorToolbar({ editor }: { editor: Editor | null }) {
   if (!editor) return null
 
   const btnClass = (active: boolean) =>
@@ -24,37 +26,34 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   async function addImage() {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/jpeg,image/png,image/webp,image/gif'
+    input.accept = IMAGE_ACCEPT
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
 
-      const supabase = createClient()
-      const ext = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-      const filePath = `blog/${fileName}`
-
-      const { error } = await supabase.storage
-        .from('blog-images')
-        .upload(filePath, file, { cacheControl: '31536000', upsert: false })
-
-      if (error) {
-        alert('Upload failed: ' + error.message)
-        return
+      try {
+        const result = await uploadBlogImage(createClient(), file)
+        if ('error' in result) {
+          alert(result.error)
+          return
+        }
+        editor?.chain().focus().setImage({ src: result.url }).run()
+      } catch {
+        alert('Upload failed. Please try again.')
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('blog-images')
-        .getPublicUrl(filePath)
-
-      editor?.chain().focus().setImage({ src: publicUrl }).run()
     }
     input.click()
   }
 
   function addLink() {
-    const url = prompt('Enter URL:')
+    const url = prompt('Enter URL:')?.trim()
     if (!url) return
+    // Same allowlist as TipTapRenderer: web, mail, phone, on-site paths and
+    // anchors. Anything else (javascript:, data:, //host) is refused at entry too.
+    if (!isSafeHref(url)) {
+      alert('Links must start with https://, http://, mailto:, tel:, / or #.')
+      return
+    }
     editor?.chain().focus().setLink({ href: url }).run()
   }
 
@@ -96,12 +95,24 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
 export default function PostEditor({ content, onChange }: PostEditorProps) {
   const editor = useEditor({
+    // Render on the client only; rendering during SSR causes a hydration
+    // mismatch in the App Router (TipTap's documented Next.js setting).
+    immediatelyRender: false,
+    // TipTap 3 no longer re-renders on every transaction by default; the
+    // toolbar reads isActive() during render, so opt back in or its active
+    // states go stale when only the selection moves.
+    shouldRerenderOnTransaction: true,
     extensions: [
+      // TipTap 3's StarterKit already bundles Link (and Underline), so Link is
+      // configured here rather than registered a second time. Underline is
+      // off: TipTapRenderer has no case for it, so Ctrl+U would show in the
+      // editor and vanish on the site.
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        link: { openOnClick: false },
+        underline: false,
       }),
       Image.configure({ inline: false }),
-      Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: 'Start writing your post...' }),
     ],
     content: content && Object.keys(content).length > 0 ? content : undefined,

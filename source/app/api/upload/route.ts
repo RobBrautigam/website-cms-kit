@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/require'
+import { IMAGE_TYPES, MAX_IMAGE_BYTES, newImagePath } from '@/lib/admin/upload-image'
 
-// MIME -> extension. Also serves as the type allowlist: a file whose MIME
-// isn't a key here is rejected. The extension is derived from this, never from
-// the client-supplied filename.
-const MIME_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-}
+// An optional server-side upload path: nothing in the kit calls it (the
+// editor uploads from the browser through lib/admin/upload-image.ts). It
+// shares that helper's type list (MIME -> extension, also the allowlist),
+// size cap and file naming, so the two paths can never disagree.
 
 export async function POST(request: NextRequest) {
   // Admin-only. Every other mutating route gates with requireAdmin; the proxy
@@ -27,17 +23,16 @@ export async function POST(request: NextRequest) {
 
   // Validate type via MIME (the allowlist) and derive the extension from it,
   // NOT from the user-supplied filename.
-  const ext = MIME_EXT[file.type]
+  const ext = IMAGE_TYPES[file.type]
   if (!ext) {
     return NextResponse.json({ error: 'Invalid file type. Allowed: JPEG, PNG, WebP, GIF' }, { status: 400 })
   }
 
   // Validate file size (5MB max)
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: 'File too large. Maximum 5MB' }, { status: 400 })
   }
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-  const filePath = `blog/${fileName}`
+  const filePath = newImagePath(ext)
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)

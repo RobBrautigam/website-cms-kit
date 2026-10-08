@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
 
 interface ImageUploaderProps {
   currentUrl?: string
@@ -20,28 +21,22 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
     if (!file) return
 
     setUploading(true)
-
-    const ext = file.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-    const filePath = `blog/${fileName}`
-
-    const { error } = await supabase.storage
-      .from('blog-images')
-      .upload(filePath, file, { cacheControl: '31536000', upsert: false })
-
-    if (error) {
-      alert('Upload failed: ' + error.message)
+    try {
+      const result = await uploadBlogImage(supabase, file)
+      if ('error' in result) {
+        alert(result.error)
+        return
+      }
+      setPreview(result.url)
+      onUpload(result.url)
+    } catch {
+      alert('Upload failed. Please try again.')
+    } finally {
+      // Always release the button and clear the input, so the same file can
+      // be picked again after an error.
       setUploading(false)
-      return
+      if (fileRef.current) fileRef.current.value = ''
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('blog-images')
-      .getPublicUrl(filePath)
-
-    setPreview(publicUrl)
-    onUpload(publicUrl)
-    setUploading(false)
   }
 
   function handleRemove() {
@@ -58,6 +53,7 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview} alt="Preview" className="w-full aspect-[16/9] object-cover" />
           <button
+            type="button"
             onClick={handleRemove}
             className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded hover:bg-black/80 transition"
           >
@@ -77,7 +73,7 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
       <input
         ref={fileRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={IMAGE_ACCEPT}
         onChange={handleUpload}
         className="hidden"
       />

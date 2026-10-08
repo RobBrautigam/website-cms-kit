@@ -1,4 +1,4 @@
-# 09 — Environment and Deploy
+# 09 - Environment and Deploy
 
 Env vars, the Supabase setup checklist, dependency classification, and host notes.
 
@@ -7,17 +7,19 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 | Var | Required | Scope | Purpose |
 |---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | public | Supabase project URL. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | public | Anon key. Public by design (in the client bundle); RLS protects the data. |
-| `SUPABASE_SERVICE_ROLE_KEY` | yes | **server-only** | Bypasses RLS. Used by `createServiceClient`, the `/api/admin/*` routes, and `requireAdmin`'s role lookup. NEVER expose to the browser or the CI build. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | public | The public key: the legacy `anon` key or a newer publishable key (`sb_publishable_...`). Public by design (in the client bundle); RLS protects the data. |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | **server-only** | The server key: the legacy `service_role` key or a newer secret key (`sb_secret_...`). Bypasses RLS. Used by `createServiceClient`, the `/api/admin/*` routes, and `requireAdmin`'s role lookup. NEVER expose to the browser or the CI build. |
 | `ANTHROPIC_API_KEY` | optional | server-only | Only if you use the `/api/ai/*` content-generation routes. |
 | `NEXT_PUBLIC_SITE_URL` | optional | public | Absolute site URL, for building links. |
 
 `.env.example` lists these with placeholders. Copy to `.env.local` for dev; set them in your host's dashboard for production. Never commit real values.
 
+**Supabase's two key generations.** Projects now show publishable and secret keys first; the JWT-based `anon` and `service_role` keys are listed as legacy. The kit reads whichever you put in the two variables above, so you can switch without a code change. Two things differ with the new keys: a secret key is refused when sent from a browser (a useful guard), and either new key can be rotated on its own without rotating the project's JWT secret. The variable names keep the old wording so existing deployments keep working.
+
 ## Supabase setup (once per project)
 
 1. Run `source/supabase/migrations/000_admin_cms_schema.sql` in the SQL editor.
-2. Create the `blog-images` Storage bucket: public, 5 MB limit, MIME allow-list `image/jpeg, image/png, image/webp, image/gif`.
+2. Check the `blog-images` Storage bucket the migration created: public, 5 MB limit, MIME allow-list `image/jpeg, image/png, image/webp, image/gif`, and the four `blog_images_admin_*` policies on `storage.objects`.
 3. Auth -> URL Configuration -> Redirect URLs: add `/admin/reset-password` and `/admin/reset-password?context=invite` for prod + localhost.
 4. Auth -> Providers -> Email: configure production SMTP; the default sender is rate-limited.
 5. Auth -> Multi-Factor: enable TOTP.
@@ -25,9 +27,9 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 7. Seed your first super-admin (see the runbook).
 8. (Optional) enable the `pg_cron` extension and schedule the audit-log retention job (commented block at the end of the migration).
 
-## Build-time dependency classification (read this — it bites)
+## Build-time dependency classification (read this - it bites)
 
-Hosts that set `NODE_ENV=production` at install time (Railway, Render, Heroku, App Engine, and others) run `npm install` with `--omit=dev`, which **skips `devDependencies`**. Anything used by `next build` must therefore live in `dependencies`, not `devDependencies` — including `tailwindcss`, `@tailwindcss/postcss`, `postcss`, `autoprefixer`, `typescript`, and your `@types/*`. The default scaffolding from many tools puts these in `devDependencies`, which works locally (dev installs everything) and fails only in production. If a production build dies with "module not found" for a package that is clearly in your `package.json`, check whether it is in `devDependencies` and move it.
+Hosts that set `NODE_ENV=production` at install time (Railway, Render, Heroku, App Engine, and others) run `npm install` with `--omit=dev`, which **skips `devDependencies`**. Anything used by `next build` must therefore live in `dependencies`, not `devDependencies` - including `tailwindcss`, `@tailwindcss/postcss`, `postcss`, `autoprefixer`, `typescript`, and your `@types/*`. The default scaffolding from many tools puts these in `devDependencies`, which works locally (dev installs everything) and fails only in production. If a production build dies with "module not found" for a package that is clearly in your `package.json`, check whether it is in `devDependencies` and move it.
 
 Verify locally before deploying:
 
@@ -39,7 +41,7 @@ npm run build      # if this fails on a missing module, it's misclassified
 
 ## Deploy
 
-The kit is host-agnostic — any Node host that runs `next build` + `next start` works (Railway, Render, Fly, a container, etc.). The deploy is also your build gate: a broken build fails the deploy and the host keeps serving the last good version.
+The kit is host-agnostic - any Node host that runs `next build` + `next start` works (Railway, Render, Fly, a container, etc.). The deploy is also your build gate: a broken build fails the deploy and the host keeps serving the last good version.
 
 Generic flow:
 1. Set the env vars in the host dashboard (all five, with the service-role key marked secret/server-only).
@@ -52,4 +54,4 @@ Generic flow:
 
 ### Static vs dynamic
 
-Admin pages set `export const dynamic = 'force-dynamic'` (they must never be statically cached — they show per-request, per-role data). Public pages that read published content can stay static/ISR; the `/api/revalidate` route lets a publish action invalidate them.
+Admin pages set `export const dynamic = 'force-dynamic'` (they must never be statically cached - they show per-request, per-role data). Public pages that read published content can stay static/ISR; the `/api/revalidate` route lets a publish action invalidate them.

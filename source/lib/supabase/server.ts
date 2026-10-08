@@ -1,6 +1,15 @@
+// Fails the build if a client component ever imports this module, so the
+// service-role key cannot be bundled for the browser by accident.
+import 'server-only'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+
+// Server-side clients that are not tied to a user's cookie session keep no
+// session of their own: nothing to persist, nothing to refresh.
+const STATELESS_AUTH = {
+  auth: { persistSession: false, autoRefreshToken: false },
+} as const
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
@@ -42,7 +51,8 @@ export async function createServerSupabaseClient() {
 export function createServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    STATELESS_AUTH
   )
 }
 
@@ -58,6 +68,7 @@ export function createServiceClient() {
 export function createAnonServerClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    STATELESS_AUTH
   )
 }

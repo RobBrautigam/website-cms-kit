@@ -1,4 +1,4 @@
-# 05 — The CMS Resource Pattern
+# 05 - The CMS Resource Pattern
 
 Every content type in this kit (posts, jobs, testimonials, redirects) follows the same shape. Learn it once and adding your own resource is mechanical. This doc is the "add your own resource" guide.
 
@@ -63,21 +63,21 @@ export async function deleteThing(id: string): Promise<ActionResult> {
 
 Three rules that matter:
 
-- **Bind ids server-side, never trust the client.** A row delete button receives `deleteThing.bind(null, row.id)` — the id is captured on the server, so a tampered client cannot retarget the deletion. `RowDeleteButton` is built to take a pre-bound action with no client args for exactly this reason.
+- **Bind ids server-side, never trust the client.** A row delete button receives `deleteThing.bind(null, row.id)` - the id is captured on the server, so a tampered client cannot retarget the deletion. `RowDeleteButton` is built to take a pre-bound action with no client args for exactly this reason.
 - **Return `ActionResult`, don't throw.** `wrapSupabaseError()` maps Postgres error codes to friendly messages (23505 -> "already exists", 42501 -> "permission denied, sign in again"). The client toasts `result.error` on `{ok:false}`.
 - **Audit every meaningful mutation** and `revalidatePath` every surface the change affects (the admin list AND any public page, e.g. `/blog`).
 
 ## The form (client component, shared by new + edit)
 
-One `<Resource>Form` component takes optional `initialData`. `new/page.tsx` renders it empty; `[id]/edit/page.tsx` fetches the row and passes it in. The form uses controlled inputs, validates, and on submit either inserts or updates via the browser Supabase client (RLS enforced) or a server action. The posts form additionally does localStorage autosave + restore and an optional AI-generate modal — both are opt-in extras, not required by the pattern.
+One `<Resource>Form` component takes optional `initialData`. `new/page.tsx` renders it empty; `[id]/edit/page.tsx` fetches the row and passes it in. The form uses controlled inputs, validates, and on submit either inserts or updates via the browser Supabase client (RLS enforced) or a server action. The posts form additionally does localStorage autosave + restore and an optional AI-generate modal - both are opt-in extras, not required by the pattern.
 
 ## Shared building blocks (`source/components/admin/`)
 
-- `RowDeleteButton` — confirm dialog + bound delete action + toast. Drop into any table row.
-- `ToggleButton` — optimistic on/off (publish/draft, active/inactive). Takes a bound server action.
-- `ConfirmDialog` / `ModalShell` — accessible modal with focus trap, escape, backdrop dismiss.
-- `SubmitButton` — disables while the form action is pending (`useFormStatus`).
-- `ImageUploader` — uploads to the `blog-images` Storage bucket, returns the public URL.
+- `RowDeleteButton` - confirm dialog + bound delete action + toast. Drop into any table row.
+- `ToggleButton` - optimistic on/off (publish/draft, active/inactive). Takes a bound server action.
+- `ConfirmDialog` / `ModalShell` - accessible modal with focus trap, escape, backdrop dismiss.
+- `SubmitButton` - disables while the form action is pending (`useFormStatus`).
+- `ImageUploader` - uploads to the `blog-images` Storage bucket, returns the public URL.
 
 ## Checklist: add a new resource
 

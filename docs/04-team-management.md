@@ -1,4 +1,4 @@
-# 04 — Team Management
+# 04 - Team Management
 
 Super-admin-only user management: invite, change role, deactivate, reactivate, and password recovery. UI lives at `/admin/team` (`source/app/(admin)/admin/team/`); the mutations are JSON route handlers under `source/app/api/admin/users/`. Every endpoint is gated by `requireSuperAdmin()`.
 
@@ -32,9 +32,9 @@ Soft deactivation sets `user_roles.deactivated_at` (`POST .../deactivate`); reac
 
 ## The components
 
-- `team/page.tsx` — `requireSuperAdmin()`, fetches members, renders `TeamPage`.
-- `TeamPage.tsx` / `TeamMemberRow.tsx` — the list + per-row actions (role select, deactivate/reactivate, recover).
-- `InviteModal.tsx` — the invite form (name, email, role), posts to the invite endpoint.
+- `team/page.tsx` - `requireSuperAdmin()`, fetches members, renders `TeamPage`.
+- `TeamPage.tsx` / `TeamMemberRow.tsx` - the list + per-row actions (role select, deactivate/reactivate, recover).
+- `InviteModal.tsx` - the invite form (name, email, role), posts to the invite endpoint.
 
 ## Why these are route handlers, not server actions
 
