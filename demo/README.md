@@ -1,23 +1,64 @@
-# Demo — visual tour
+# Interactive demo
 
-Static, **white-labeled** mockups of what this kit's admin surface looks like, built from the kit's own neutral design tokens (`source/app/globals.css`). The placeholder brand is **Acme** on `example.com`.
+**Live:** https://robbrautigam.github.io/website-cms-kit/demo/ (landing page) and https://robbrautigam.github.io/website-cms-kit/demo/app/ (the demo itself).
 
-These are plain self-contained HTML files (inline CSS, no build, no data, no auth). They are a *visual* — the real, working implementation is the `source/` tree. Open them directly in a browser:
+A working, white-labeled version of the kit's admin that runs entirely in the browser. The placeholder brand is **Acme** on `example.com`.
 
-- [`login.html`](login.html) — the admin login screen (`AuthShell` + `LoginForm`): invite-only email + password, show/hide password, remember-me, two-factor hint.
-- [`dashboard.html`](dashboard.html) — the admin shell (`AdminShell` + `AdminSidebar`) with the Posts list (`PostsTable`): sectioned nav, role badge, search + filters, status chips, row actions.
+**Sample data only.** Every post, person, image and log entry is invented. It is stored in your browser's `localStorage` and nothing is sent anywhere: there is no server, no database and no real sign-in. The production version of every screen is the Next.js and Supabase code in [`../source/`](../source/).
+
+Sign in with the pre-filled form (any password works); the two-factor code is `123456`.
+
+## In the kit today, and what is proposed
+
+Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar and on the page.
+
+| | |
+|---|---|
+| **In the kit's source today** | Invite-only sign-in, two-factor and recovery codes, posts with draft, scheduled and published states, a per-post preview, local autosave, the TipTap editor, image upload from the post form, team management, the audit log with CSV export, redirects. (The kit also has jobs, testimonials, a sitemap view and a help page, which the demo leaves out.) |
+| **Proposed, previewed in the demo** | Staged edits on a live post (the kit today updates a live post on save), the whole-site staging preview with publish-selected, and the media library page. |
+| **Demo-only helpers** | The light and dark theme switch (the kit documents how to add one), viewing the admin as another role, reset demo data. |
+
+## What works
+
+| Area | In the demo |
+|---|---|
+| Sign-in | Demo login, show or hide password, remember me, forgot password, two-factor step, recovery codes (using one turns two-factor off and forces setup again, as in the kit). |
+| Posts | Status counts, search, status and category filters, sort, edit, preview, duplicate, publish, unpublish, delete. |
+| Editor | TipTap rich-text editor (headings, bold, italic, underline, strike, lists, quote, rule, links with a scheme allowlist, images), autosave, URL slug check, word count, schedule, publish, discard staged changes. |
+| States | Draft, scheduled, published, and published with staged changes. A live post keeps showing its last published version until you publish the edits. |
+| Site preview | The whole site with every staged change, a live and staging toggle, and publish-selected. |
+| Media | Upload (JPEG, PNG, WebP or GIF up to 5 MB, resized in the browser), alt text, delete, pick as a featured or inline image. |
+| Team | Invite, change role, turn access off and on, reset link, resend or cancel an invite, the last-super-admin guard. |
+| Audit log | Every action above, filter by type and person, search, 50 rows a page, CSV export (with spreadsheet formula injection neutralized). |
+| Redirects | Add, edit, toggle, delete, a path tester, and validation for loops, duplicates, reserved paths and two-hop chains. |
+| Settings | Light, dark or system theme, new recovery codes, two-factor off and on, change password with live rules, view the admin as an `admin` instead of a `super_admin`, reset demo data. |
+
+It works at phone and desktop widths, in light and dark themes, with the keyboard alone, and with a screen reader (labeled controls, focus moved to each page's heading, focus-trapped dialogs, announced notifications).
+
+## How it is built
+
+- Plain HTML, CSS and JavaScript in [`app/`](app/). No build step and no framework.
+- A strict Content Security Policy (`default-src 'self'`, no inline script, no inline style, `connect-src 'none'`), so the page cannot send data anywhere even by mistake.
+- The editor is [TipTap](https://tiptap.dev) 3.31.4, bundled once into [`vendor/tiptap-3.31.4.min.js`](vendor/) with its license notices in [`vendor/THIRD_PARTY_NOTICES.md`](vendor/THIRD_PARTY_NOTICES.md). TipTap's own style injection is turned off and its base CSS lives in `app.css`, the same setup the security checklist recommends for a strict CSP.
+- Colors come from the kit's design tokens, with one `[data-theme="dark"]` override block.
 
 ## Screenshots
 
-### Admin login
-![Admin login](screenshots/login-desktop.png)
+| | |
+|---|---|
+| ![Posts list](screenshots/posts-light-desktop.png) | ![Editor](screenshots/editor-light-desktop.png) |
+| ![Site preview with staged changes](screenshots/site-preview-light-desktop.png) | ![Audit log](screenshots/audit-log-light-desktop.png) |
+| ![Posts in the dark theme](screenshots/posts-dark-desktop.png) | ![Sign-in](screenshots/login-light-desktop.png) |
 
-### Admin dashboard (Posts)
-![Admin dashboard](screenshots/dashboard-desktop.png)
+Phone: ![Posts on a phone, dark theme](screenshots/posts-dark-mobile.png) ![Editor on a phone](screenshots/editor-light-mobile.png)
 
-### Login on mobile
-![Admin login on mobile](screenshots/login-mobile.png)
+## Run it locally
 
-## Re-theming
+Any static file server works, for example from the repository root:
 
-Every color here comes from the CSS variables in [`../source/app/globals.css`](../source/app/globals.css). The demo inlines the same neutral slate + blue palette. To see the whole surface re-theme, change the `:root` values in `globals.css` (the components reference semantic token classes like `bg-bg-card`, `text-accent`, `btn-primary`, never raw colors). The demo files inline a copy of those tokens so they render standalone.
+```bash
+python -m http.server 8000
+# then open http://localhost:8000/demo/
+```
+
+The old static mockups (`login.html`, `dashboard.html`) now forward to the working demo.

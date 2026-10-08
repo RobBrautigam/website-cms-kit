@@ -1,26 +1,26 @@
-# 07 — Reproduction Runbook
+# 07 - Reproduction Runbook
 
 Stand up the admin CMS on a fresh Next.js 16 + Supabase project, in order. Each step is concrete. An "adapting to an existing app" addendum is at the end.
 
 ## Prerequisites
 
 - A Next.js 16 App Router app (TypeScript, Tailwind v4). `npx create-next-app@latest` is fine.
-- A Supabase project (free tier works). Have the project URL, anon key, and service-role key handy (Project Settings -> API).
+- A Supabase project (free tier works). Have the project URL and two keys handy (Project Settings -> API Keys): the public one (the legacy `anon` key or a newer `sb_publishable_...` key) and the server-only one (the legacy `service_role` key or a newer `sb_secret_...` key). Either generation works in the same two variables.
 - Node 22+.
 
 ## 1. Install dependencies
 
 ```bash
-npm i @supabase/ssr @supabase/supabase-js zod react-hook-form @hookform/resolvers sonner lucide-react bcryptjs
-# Rich-text editor (posts resource):
-npm i @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-link @tiptap/extension-placeholder @tiptap/pm
+npm i @supabase/ssr @supabase/supabase-js server-only zod react-hook-form @hookform/resolvers sonner lucide-react bcryptjs
+# Rich-text editor (posts resource). TipTap 3's StarterKit includes Link and Underline:
+npm i @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-placeholder @tiptap/pm
 # Help page renderer (optional):
 npm i react-markdown remark-gfm
 # AI generation route (optional):
 npm i @anthropic-ai/sdk
 ```
 
-All of these belong in `dependencies`, not `devDependencies` — hosts that set `NODE_ENV=production` at install time skip devDeps and your build will fail. (See [09-environment-and-deploy.md](09-environment-and-deploy.md).)
+All of these belong in `dependencies`, not `devDependencies` - hosts that set `NODE_ENV=production` at install time skip devDeps and your build will fail. (See [09-environment-and-deploy.md](09-environment-and-deploy.md).)
 
 ## 2. Environment variables
 
@@ -37,15 +37,17 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 
 ## 3. Run the schema migration
 
-Open Supabase -> SQL Editor, paste the entire contents of `source/supabase/migrations/000_admin_cms_schema.sql`, and run it. This creates `user_roles`, the `SECURITY DEFINER` role helpers, all content tables with hardened RLS, the audit log, and the MFA recovery-code store.
+Open Supabase -> SQL Editor, paste the entire contents of `source/supabase/migrations/000_admin_cms_schema.sql`, and run it. This creates `user_roles`, the `SECURITY DEFINER` role helpers, all content tables with hardened RLS, the audit log, the MFA recovery-code store, and the `blog-images` Storage bucket with its write policies.
 
-## 4. Create the Storage bucket
+## 4. Check the Storage bucket
 
-Supabase -> Storage -> New bucket:
+The migration creates the bucket (section 9 of the SQL file). Open Supabase -> Storage and confirm it reads:
 - Name: `blog-images`
 - Public: ON
 - File size limit: 5 MB
 - Allowed MIME types: `image/jpeg, image/png, image/webp, image/gif`
+
+And under Storage -> Policies, four `blog_images_admin_*` policies on `objects`. If you create the bucket by hand instead, you still need those policies: without them every upload is refused.
 
 ## 5. Configure Supabase Auth
 

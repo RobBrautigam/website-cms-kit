@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/require'
+import { IMAGE_TYPES, MAX_IMAGE_BYTES } from '@/lib/admin/upload-image'
 
 // MIME -> extension. Also serves as the type allowlist: a file whose MIME
 // isn't a key here is rejected. The extension is derived from this, never from
-// the client-supplied filename.
-const MIME_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-}
+// the client-supplied filename. Shared with the browser upload helper so the
+// two paths can never disagree.
+const MIME_EXT = IMAGE_TYPES
 
 export async function POST(request: NextRequest) {
   // Admin-only. Every other mutating route gates with requireAdmin; the proxy
@@ -33,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate file size (5MB max)
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: 'File too large. Maximum 5MB' }, { status: 400 })
   }
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`

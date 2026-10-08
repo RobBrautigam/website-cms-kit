@@ -3,9 +3,9 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { createClient } from '@/lib/supabase/client'
+import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
 import { getWordCount } from '@/lib/utils'
 
 interface PostEditorProps {
@@ -24,37 +24,31 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   async function addImage() {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/jpeg,image/png,image/webp,image/gif'
+    input.accept = IMAGE_ACCEPT
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
 
-      const supabase = createClient()
-      const ext = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-      const filePath = `blog/${fileName}`
-
-      const { error } = await supabase.storage
-        .from('blog-images')
-        .upload(filePath, file, { cacheControl: '31536000', upsert: false })
-
-      if (error) {
-        alert('Upload failed: ' + error.message)
+      const result = await uploadBlogImage(createClient(), file)
+      if ('error' in result) {
+        alert(result.error)
         return
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('blog-images')
-        .getPublicUrl(filePath)
-
-      editor?.chain().focus().setImage({ src: publicUrl }).run()
+      editor?.chain().focus().setImage({ src: result.url }).run()
     }
     input.click()
   }
 
   function addLink() {
-    const url = prompt('Enter URL:')
+    const url = prompt('Enter URL:')?.trim()
     if (!url) return
+    // Same allowlist as TipTapRenderer: web, mail, phone, on-site paths and
+    // anchors. Anything else (javascript:, data:) is refused at entry too.
+    if (!/^(https?:|mailto:|tel:|\/|#)/i.test(url)) {
+      alert('Links must start with https://, http://, mailto:, tel:, / or #.')
+      return
+    }
     editor?.chain().focus().setLink({ href: url }).run()
   }
 
@@ -96,12 +90,17 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
 export default function PostEditor({ content, onChange }: PostEditorProps) {
   const editor = useEditor({
+    // Render on the client only; rendering during SSR causes a hydration
+    // mismatch in the App Router (TipTap's documented Next.js setting).
+    immediatelyRender: false,
     extensions: [
+      // TipTap 3's StarterKit already bundles Link (and Underline), so Link is
+      // configured here rather than registered a second time.
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        link: { openOnClick: false },
       }),
       Image.configure({ inline: false }),
-      Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: 'Start writing your post...' }),
     ],
     content: content && Object.keys(content).length > 0 ? content : undefined,

@@ -3,8 +3,8 @@
 -- ============================================================================
 -- Run this once in your Supabase SQL editor (Dashboard -> SQL Editor) on a
 -- fresh project. It stands up the whole admin CMS: roles + RLS, the content
--- tables (posts, jobs, testimonials, redirects), the audit log, and the MFA
--- recovery-code store.
+-- tables (posts, jobs, testimonials, redirects), the audit log, the MFA
+-- recovery-code store, and the image bucket with its Storage policies.
 --
 -- This is the clean END STATE consolidated from an incrementally-migrated
 -- production app. Idempotent where practical (IF NOT EXISTS / OR REPLACE), so
@@ -446,11 +446,54 @@ create index if not exists admin_mfa_recovery_codes_user_idx
 alter table public.admin_mfa_recovery_codes enable row level security;
 
 
+-- ----------------------------------------------------------------------------
+-- 9. Storage: the blog-images bucket and who may write to it
+-- ----------------------------------------------------------------------------
+-- The editor uploads straight from the browser with the signed-in user's
+-- session, so these policies ARE the authorization for uploads. Without them
+-- every upload is refused, and the tempting quick fix ("authenticated can
+-- insert") would let any signed-in account write, deactivated ones included.
+-- Public READ needs no policy: a public bucket serves objects by URL. The
+-- size and type limits are enforced by Storage itself, server-side, whatever
+-- the browser claims.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'blog-images', 'blog-images', true, 5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "blog_images_admin_read" on storage.objects;
+create policy "blog_images_admin_read"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()));
+
+drop policy if exists "blog_images_admin_insert" on storage.objects;
+create policy "blog_images_admin_insert"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()));
+
+drop policy if exists "blog_images_admin_update" on storage.objects;
+create policy "blog_images_admin_update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()))
+  with check (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()));
+
+drop policy if exists "blog_images_admin_delete" on storage.objects;
+create policy "blog_images_admin_delete"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid()));
+
+
 -- ============================================================================
 -- POST-MIGRATION STEPS (do these in the dashboard / a follow-up query)
 -- ============================================================================
 --
--- A. Storage bucket for images (Dashboard -> Storage -> New bucket):
+-- A. Storage bucket for images: section 9 above creates it and its write
+--    policies. Check it in Dashboard -> Storage; it should read:
 --      Name:               blog-images
 --      Public:             ON
 --      File size limit:    5 MB

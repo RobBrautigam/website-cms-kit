@@ -1,73 +1,146 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Website CMS Kit — live demo</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="An interactive, in-browser demo of the Website CMS Kit admin: sign-in with two-factor, posts, a rich-text editor, staging preview, media, team, audit log and redirects. Invented sample data only.">
+<title>Website CMS Kit: interactive demo</title>
 <style>
-  :root{
-    --bg:#f8fafc; --white:#fff; --card:#f1f5f9; --text:#0f172a; --muted:#475569;
-    --accent:#2563eb; --accent-hover:#1d4ed8; --border:#e2e8f0;
-    --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  :root {
+    --bg: #f8fafc; --white: #fff; --card: #f1f5f9; --text: #0f172a; --muted: #475569;
+    --accent: #2563eb; --accent-hover: #1d4ed8; --border: #e2e8f0; --note: #fef9c3; --note-text: #713f12;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
-  *{box-sizing:border-box}
-  body{margin:0; font-family:var(--font); color:var(--text); background:linear-gradient(to bottom,#fff,var(--card)); min-height:100vh; -webkit-font-smoothing:antialiased}
-  .wrap{max-width:960px; margin:0 auto; padding:64px 24px 80px}
-  .head{display:flex; flex-direction:column; align-items:center; text-align:center; margin-bottom:48px}
-  .mark{color:var(--accent)}
-  .kicker{margin-top:16px; font-size:11px; font-weight:800; letter-spacing:.22em; text-transform:uppercase; color:rgba(71,85,105,.7)}
-  h1{margin:10px 0 0; font-size:34px; font-weight:900; letter-spacing:-.02em}
-  .lede{margin:12px 0 0; color:var(--muted); font-size:16px; max-width:38rem; line-height:1.6}
-  .grid{display:grid; grid-template-columns:1fr 1fr; gap:24px}
-  @media (max-width:720px){.grid{grid-template-columns:1fr}}
-  .card{display:block; text-decoration:none; color:inherit; background:var(--white); border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 32px -18px rgba(0,0,0,.18); transition:transform .15s ease, box-shadow .15s ease}
-  .card:hover{transform:translateY(-3px); box-shadow:0 1px 2px rgba(0,0,0,.04),0 22px 48px -20px rgba(0,0,0,.28)}
-  .shot{display:block; width:100%; height:auto; border-bottom:1px solid var(--border)}
-  .cap{padding:18px 20px}
-  .cap h2{margin:0; font-size:17px; font-weight:800}
-  .cap p{margin:6px 0 0; font-size:13px; color:var(--muted); line-height:1.5}
-  .go{display:inline-flex; align-items:center; gap:6px; margin-top:12px; font-size:13px; font-weight:700; color:var(--accent)}
-  .foot{margin-top:48px; text-align:center; font-size:13px; color:var(--muted)}
-  .foot a{color:var(--accent); text-decoration:none; font-weight:600}
-  .note{margin-top:8px; font-size:12px; color:rgba(71,85,105,.7)}
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120; --white: #111827; --card: #0f172a; --text: #e2e8f0; --muted: #94a3b8;
+      --accent: #60a5fa; --accent-hover: #93c5fd; --border: #1f2937; --note: #422006; --note-text: #fde68a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); color: var(--text); background: var(--bg); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-hover); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 56px 24px 80px; }
+  header { text-align: center; }
+  .kicker { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 10px 0 0; font-size: clamp(28px, 5vw, 40px); font-weight: 900; letter-spacing: -.02em; line-height: 1.15; }
+  .lede { margin: 14px auto 0; max-width: 42rem; color: var(--muted); font-size: 17px; }
+  .cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 24px; padding: 14px 22px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 800; text-decoration: none; font-size: 16px; }
+  .cta:hover { background: var(--accent-hover); color: #fff; }
+  @media (prefers-color-scheme: dark) { .cta, .cta:hover { color: #0b1120; } }
+  .creds { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .creds code { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; color: var(--text); }
+  .note { margin: 28px auto 0; max-width: 46rem; padding: 14px 18px; border-radius: 12px; background: var(--note); color: var(--note-text); font-size: 14px; text-align: left; }
+  h2 { margin: 56px 0 16px; font-size: 22px; font-weight: 900; letter-spacing: -.01em; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  figure { margin: 0; background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  figure img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--border); }
+  figcaption { padding: 14px 16px; font-size: 14px; color: var(--muted); }
+  figcaption strong { color: var(--text); }
+  .phones { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 20px; justify-content: center; }
+  ol.tour { margin: 0; padding-left: 22px; }
+  ol.tour li { margin: 0 0 10px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .facts { grid-template-columns: 1fr; } }
+  .fact { background: var(--white); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; font-size: 14px; color: var(--muted); }
+  .fact strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="head">
-      <svg class="mark" width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" opacity="0.12"/>
-        <path d="M7 16 L12 7 L17 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <line x1="9.2" y1="13.2" x2="14.8" y2="13.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <p class="kicker">Website CMS Kit · live demo</p>
-      <h1>The admin surface, white-labeled</h1>
-      <p class="lede">Two static, no-build mockups of what this kit's admin looks like. Placeholder brand "Acme". The real, working implementation is the <code>source/</code> tree.</p>
-    </div>
+<main class="wrap">
+  <header>
+    <p class="kicker">Website CMS Kit</p>
+    <h1>Try the admin in your browser</h1>
+    <p class="lede">A working demo of the kit's admin: invite-only sign-in with two-factor, a posts list with search and filters, a rich-text editor with autosave, a staging preview of the whole site, media, team, redirects and a full audit log.</p>
+    <a class="cta" href="app/#/login">Open the interactive demo</a>
+    <p class="creds">The sign-in form is pre-filled and any password works. The two-factor code is <code>123456</code>.</p>
+    <p class="note"><strong>Sample data only.</strong> The demo runs entirely in your browser. Everything you see is invented, it is saved only in this browser's local storage, and nothing is sent anywhere: there is no server, no database and no real account. The production version of every screen is the Next.js and Supabase code in the <a href="https://github.com/RobBrautigam/website-cms-kit">source tree on GitHub</a>.</p>
+  </header>
 
+  <section aria-labelledby="see">
+    <h2 id="see">What it looks like</h2>
     <div class="grid">
-      <a class="card" href="login.html">
-        <img class="shot" src="screenshots/login-desktop.png" alt="Admin login screen" />
-        <div class="cap">
-          <h2>Admin login</h2>
-          <p>Invite-only email + password over Supabase cookie sessions, with mandatory two-factor.</p>
-          <span class="go">Open the login →</span>
-        </div>
-      </a>
-      <a class="card" href="dashboard.html">
-        <img class="shot" src="screenshots/dashboard-desktop.png" alt="Admin dashboard with posts list" />
-        <div class="cap">
-          <h2>Admin dashboard</h2>
-          <p>Role-aware sidebar shell + the repeatable CMS list pattern: search, filters, status chips, row actions.</p>
-          <span class="go">Open the dashboard →</span>
-        </div>
-      </a>
+      <figure>
+        <img src="screenshots/posts-light-desktop.png" width="1280" height="800" alt="The posts list: status counts, search, status and category filters, sort, and a table of posts with status chips and row actions.">
+        <figcaption><strong>Posts.</strong> Search, filter by status or category, sort, and act on a row: edit, preview, duplicate, publish or unpublish, delete.</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/editor-light-desktop.png" width="1280" height="800" alt="The post editor: a large title, a URL slug, a formatting toolbar, the rich-text body, and a publishing panel with Publish changes, Preview and Discard changes.">
+        <figcaption><strong>Editor.</strong> A real TipTap rich-text editor with autosave. In the demo, edits to a live post stay staged until you publish them (proposed; the kit today updates a live post on save).</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/site-preview-light-desktop.png" width="1280" height="800" alt="Site preview: a list of staged changes with checkboxes, a Live site and Staging toggle, and a framed preview of the public site.">
+        <figcaption><strong>Site preview (proposed).</strong> See the whole site with your staged changes, flip to the live version, then publish just the changes you pick.</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/audit-log-light-desktop.png" width="1280" height="800" alt="The audit log: a filterable table of every sign-in, publish, team and redirect change, with an export button.">
+        <figcaption><strong>Audit log.</strong> Every sensitive action, who did it and when, filterable and exportable to CSV.</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/posts-dark-desktop.png" width="1280" height="800" alt="The posts list in the dark theme.">
+        <figcaption><strong>Dark theme.</strong> Follows your system setting until you pick one; every color comes from one set of design tokens.</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/login-light-desktop.png" width="1280" height="800" alt="The sign-in screen, labeled as a demo login, with email, password, remember me and forgot password.">
+        <figcaption><strong>Sign-in.</strong> Invite-only, with a two-factor step and recovery codes. Here it is clearly labeled as a demo login.</figcaption>
+      </figure>
     </div>
+    <h2 id="phone">On a phone</h2>
+    <div class="phones">
+      <figure>
+        <img src="screenshots/posts-dark-mobile.png" width="390" height="844" alt="The posts list on a phone in the dark theme, with a menu button, stacked filters and compact rows.">
+        <figcaption><strong>Posts</strong>, dark theme.</figcaption>
+      </figure>
+      <figure>
+        <img src="screenshots/editor-light-mobile.png" width="390" height="844" alt="The editor on a phone: the title wraps, the toolbar wraps onto two rows above the body text.">
+        <figcaption><strong>Editor</strong>, light theme.</figcaption>
+      </figure>
+    </div>
+  </section>
 
-    <div class="foot">
-      Source &amp; docs on <a href="https://github.com/RobBrautigam/website-cms-kit">GitHub</a>.
-      <p class="note">These pages are visual mockups — no data, no auth, no backend.</p>
+  <section aria-labelledby="tour">
+    <h2 id="tour">A five-minute walkthrough</h2>
+    <ol class="tour">
+      <li><strong>Sign in.</strong> Press Sign in, then enter <code>123456</code>. (The two-factor step also shows a sample recovery code: using one turns two-factor off and sends you to set it up again, the same as the real kit.)</li>
+      <li><strong>Edit a post.</strong> Open "How we review a post before it goes live". Change a heading, add a link, insert an image. The "Saved in this browser" note shows autosave working.</li>
+      <li><strong>Preview before anyone else sees it.</strong> Press Preview for the one post, or open Site preview (proposed) to see the whole site with every staged change. Flip between Live site and Staging.</li>
+      <li><strong>Publish.</strong> Publish from the editor, schedule a post for later, or publish selected changes from Site preview.</li>
+      <li><strong>Media.</strong> Upload an image in the media library (proposed; it stays in your browser, resized), add alt text, and use it as a featured image.</li>
+      <li><strong>Team.</strong> Invite someone, change a role, turn someone's access off. Try to demote the last super admin: the kit refuses.</li>
+      <li><strong>Audit log.</strong> Every step above is there, with who, what and when. Filter it and export a CSV.</li>
+      <li><strong>Redirects.</strong> Add a redirect, test a path against your rules, and see loops and chains caught before they ship.</li>
+      <li><strong>Start over.</strong> "Reset demo data" in the sidebar puts everything back.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="scope">
+    <h2 id="scope">In the kit today, and what is proposed</h2>
+    <p>Most of the demo mirrors code that is in the kit's source today. A few screens preview features that are proposed but not built yet; the demo marks each one <strong>Proposed</strong>.</p>
+    <div class="facts">
+      <div class="fact"><strong>In the kit today</strong>Invite-only sign-in, two-factor and recovery codes, posts with drafts, scheduling, a per-post preview and local autosave, the rich-text editor, image upload, team management, the audit log with CSV export, and redirects.</div>
+      <div class="fact"><strong>Proposed, shown in the demo</strong>Staged edits on live posts, the whole-site staging preview with publish-selected, and the media library page.</div>
+      <div class="fact"><strong>Demo-only helpers</strong>The light and dark theme switch (the kit documents how to add it), viewing the admin as another role, and reset demo data.</div>
     </div>
-  </div>
+  </section>
+
+  <section aria-labelledby="real">
+    <h2 id="real">What the real kit adds</h2>
+    <div class="facts">
+      <div class="fact"><strong>Three security layers</strong>A proxy that checks the session, a server gate on every page and action, and Postgres row-level security as the final word.</div>
+      <div class="fact"><strong>Real accounts</strong>Supabase Auth with invite-only sign-up, TOTP two-factor, bcrypt-hashed recovery codes and password reset.</div>
+      <div class="fact"><strong>One SQL file</strong>A single migration stands up the tables, policies, audit log and image bucket on a fresh Supabase project.</div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Source, docs and security model: <a href="https://github.com/RobBrautigam/website-cms-kit">github.com/RobBrautigam/website-cms-kit</a>. MIT licensed.</p>
+    <p>The editor is TipTap (MIT); see <a href="https://github.com/RobBrautigam/website-cms-kit/blob/main/demo/vendor/THIRD_PARTY_NOTICES.md">third-party notices</a>.</p>
+  </footer>
+</main>
 </body>
 </html>
