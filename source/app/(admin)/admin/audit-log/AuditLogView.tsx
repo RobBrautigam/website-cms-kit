@@ -27,6 +27,11 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
     actions:
       "blog_post.create,blog_post.update,blog_post.delete,blog_post.publish,blog_post.unpublish,blog_post.duplicate",
   },
+  {
+    label: "Staging and approval",
+    actions:
+      "blog_post.stage,blog_post.request_review,blog_post.approve,blog_post.withdraw_review,blog_post.discard_staged,blog_post.publish_staged,staging.preview_enabled",
+  },
   { label: "Jobs", actions: "job.create,job.update,job.delete" },
   {
     label: "Testimonials",

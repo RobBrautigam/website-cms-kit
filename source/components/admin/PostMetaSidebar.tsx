@@ -37,6 +37,9 @@ export interface PostMeta {
 interface PostMetaSidebarProps {
   meta: PostMeta
   onChange: (meta: PostMeta) => void
+  /** When set, the status select is read-only and this note explains why
+   *  (a live post's edits go through staging; see docs/10). */
+  statusLockedNote?: string
 }
 
 function slugify(text: string): string {
@@ -47,7 +50,7 @@ function slugify(text: string): string {
     .slice(0, 96)
 }
 
-export default function PostMetaSidebar({ meta, onChange }: PostMetaSidebarProps) {
+export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: PostMetaSidebarProps) {
   function update(partial: Partial<PostMeta>) {
     onChange({ ...meta, ...partial })
   }
@@ -196,8 +199,10 @@ export default function PostMetaSidebar({ meta, onChange }: PostMetaSidebarProps
 
       {/* Status */}
       <div>
-        <label className="block text-sm font-semibold text-text-secondary mb-1.5">Status</label>
+        <label htmlFor="post_status" className="block text-sm font-semibold text-text-secondary mb-1.5">Status</label>
         <select
+          id="post_status"
+          disabled={!!statusLockedNote}
           value={meta.status}
           onChange={(e) => update({ status: e.target.value as PostMeta['status'] })}
           className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition"
@@ -206,6 +211,7 @@ export default function PostMetaSidebar({ meta, onChange }: PostMetaSidebarProps
           <option value="published">Published</option>
           <option value="scheduled">Scheduled</option>
         </select>
+        {statusLockedNote && <p className="text-xs text-text-secondary mt-1.5">{statusLockedNote}</p>}
       </div>
 
       {/* Scheduled Date */}

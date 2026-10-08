@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import RowDeleteButton from './RowDeleteButton'
 import ToggleButton from './ToggleButton'
 import { deletePost, togglePostStatus, duplicatePost } from '@/app/(admin)/admin/posts/actions'
+import { reviewLabel, type ReviewStatus } from '@/lib/staging/rules'
 
 // Keep in sync with the categories in PostMetaSidebar.
 const CATEGORIES = ['product', 'engineering', 'company', 'guides', 'news']
@@ -20,6 +21,21 @@ interface PostRow {
   published_at: string | null
   categories: string[]
   author_slug: string | null
+  /** Review state of the post's staged copy, when it has one. */
+  staged?: ReviewStatus
+}
+
+function StagedBadge({ status }: { status?: ReviewStatus }) {
+  if (!status) return null
+  return (
+    <Link
+      href="/admin/staging"
+      className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-accent/10 text-accent hover:underline"
+      title="This post has changes waiting in staging. The live post is unchanged."
+    >
+      {status === 'staged' ? 'Staged' : `Staged: ${reviewLabel(status).toLowerCase()}`}
+    </Link>
+  )
 }
 
 export default function PostsTable({ posts }: { posts: PostRow[] }) {
@@ -145,6 +161,7 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
                     {post.title}
                   </Link>
                   <p className="text-xs text-text-secondary mt-0.5">/{post.slug}</p>
+                  <StagedBadge status={post.staged} />
                 </td>
                 <td className="px-5 py-4 text-sm text-text-secondary whitespace-nowrap">
                   {post.author_slug || '—'}
@@ -234,6 +251,7 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
                 {post.title}
               </Link>
               <p className="text-xs text-text-secondary mt-0.5">/{post.slug}</p>
+                  <StagedBadge status={post.staged} />
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
                 <div>

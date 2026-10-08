@@ -88,3 +88,7 @@ One `<Resource>Form` component takes optional `initialData`. `new/page.tsx` rend
 5. **(Optional)** a `lib/supabase/<resource>.ts` data helper and `revalidatePath` of any public route the resource renders on.
 
 That is the whole pattern. The kit ships four instances of it so you can diff them.
+
+## Staging another resource
+
+Posts can be staged and approved before they go live ([docs/10](10-staging-and-approval.md)); the other resources still write straight to their live rows. To stage another resource, copy the posts shape: a private `<resource>_staged_changes` table with the same columns as the editable fields, the four admin policies, the restrictive two-factor policy and no anon grant; the review trigger; a `publish_staged_<resource>(uuid[])` function with `security invoker`; and a test file beside `source/supabase/tests/staging.test.mjs` that runs each rule as the public key and as each kind of admin.

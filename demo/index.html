@@ -41,7 +41,8 @@
   figure img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--border); }
   figcaption { padding: 14px 16px; font-size: 14px; color: var(--muted); }
   figcaption strong { color: var(--text); }
-  .phones { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 20px; justify-content: center; }
+  .phones { display: grid; grid-template-columns: repeat(3, minmax(0, 300px)); gap: 20px; justify-content: center; }
+  @media (max-width: 760px) { .phones { grid-template-columns: minmax(0, 300px); } }
   ol.tour { margin: 0; padding-left: 22px; }
   ol.tour li { margin: 0 0 10px; }
   .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -56,7 +57,7 @@
   <header>
     <p class="kicker">Website CMS Kit</p>
     <h1>Try the admin in your browser</h1>
-    <p class="lede">A working demo of the kit's admin: invite-only sign-in with two-factor, a posts list with search and filters, a rich-text editor with autosave, a staging preview of the whole site, media, team, redirects and a full audit log.</p>
+    <p class="lede">A working demo of the kit's admin: invite-only sign-in with two-factor, a posts list with search and filters, a rich-text editor with autosave, staging and approval with a preview of the whole site, media, team, redirects and a full audit log.</p>
     <a class="cta" href="app/#/login">Open the interactive demo</a>
     <p class="creds">The sign-in form is pre-filled and any password works. The two-factor code is <code>123456</code>.</p>
     <p class="note"><strong>Sample data only.</strong> The demo runs entirely in your browser. Everything you see is invented, it is saved only in this browser's local storage, and nothing is sent anywhere: there is no server, no database and no real account. The production version of every screen is the Next.js and Supabase code in the <a href="https://github.com/RobBrautigam/website-cms-kit">source tree on GitHub</a>.</p>
@@ -70,12 +71,12 @@
         <figcaption><strong>Posts.</strong> Search, filter by status or category, sort, and act on a row: edit, preview, duplicate, publish or unpublish, delete.</figcaption>
       </figure>
       <figure>
-        <img src="screenshots/editor-light-desktop.png" width="1280" height="800" alt="The post editor: a large title, a URL slug, a formatting toolbar, the rich-text body, and a publishing panel with Publish changes, Preview and Discard changes.">
-        <figcaption><strong>Editor.</strong> A real TipTap rich-text editor with autosave. In the demo, edits to a live post stay staged until you publish them (proposed; the kit today updates a live post on save).</figcaption>
+        <img src="screenshots/editor-light-desktop.png" width="1280" height="800" alt="The post editor on a live post with staged changes: a large title, a URL slug, a formatting toolbar, the rich-text body, and a publishing panel showing In review, with Publish now, Approve, Withdraw request, Preview and Open staging.">
+        <figcaption><strong>Editor.</strong> A real TipTap rich-text editor with autosave. Edits to a live post are saved as a staged copy; the public site keeps showing the live version until someone publishes.</figcaption>
       </figure>
       <figure>
-        <img src="screenshots/site-preview-light-desktop.png" width="1280" height="800" alt="Site preview: a list of staged changes with checkboxes, a Live site and Staging toggle, and a framed preview of the public site.">
-        <figcaption><strong>Site preview (proposed).</strong> See the whole site with your staged changes, flip to the live version, then publish just the changes you pick.</figcaption>
+        <img src="screenshots/staging-light-desktop.png" width="1280" height="800" alt="The staging page: a list of staged changes with checkboxes, Edited, New, Staged, In review and Approved labels, Compare, Request review, Approve and Discard buttons, Publish selected, and the live and staged versions side by side.">
+        <figcaption><strong>Staging.</strong> Every staged change in one place. Ask a teammate to review one, approve theirs, compare live and staged side by side, then publish just the changes you pick.</figcaption>
       </figure>
       <figure>
         <img src="screenshots/audit-log-light-desktop.png" width="1280" height="800" alt="The audit log: a filterable table of every sign-in, publish, team and redirect change, with an export button.">
@@ -97,6 +98,10 @@
         <figcaption><strong>Posts</strong>, dark theme.</figcaption>
       </figure>
       <figure>
+        <img src="screenshots/staging-dark-mobile.png" width="390" height="844" alt="The staging page on a phone in the dark theme, with the staged changes stacked and their buttons wrapping under each title.">
+        <figcaption><strong>Staging</strong>, dark theme.</figcaption>
+      </figure>
+      <figure>
         <img src="screenshots/editor-light-mobile.png" width="390" height="844" alt="The editor on a phone: the title wraps, the toolbar wraps onto two rows above the body text.">
         <figcaption><strong>Editor</strong>, light theme.</figcaption>
       </figure>
@@ -107,9 +112,10 @@
     <h2 id="tour">A five-minute walkthrough</h2>
     <ol class="tour">
       <li><strong>Sign in.</strong> Press Sign in, then enter <code>123456</code>. (The two-factor step also shows a sample recovery code: using one turns two-factor off and sends you to set it up again, the same as the real kit.)</li>
-      <li><strong>Edit a post.</strong> Open "How we review a post before it goes live". Change a heading, add a link, insert an image. The "Saved in this browser" note shows autosave working.</li>
-      <li><strong>Preview before anyone else sees it.</strong> Press Preview for the one post, or open Site preview (proposed) to see the whole site with every staged change. Flip between Live site and Staging.</li>
-      <li><strong>Publish.</strong> Publish from the editor, schedule a post for later, or publish selected changes from Site preview.</li>
+      <li><strong>Edit a live post.</strong> Open "Release notes: faster image uploads and alt text reminders". Change a heading, add a link, insert an image. The live site keeps the published version; your edit is a staged change, and the "Saved in this browser" note shows autosave working.</li>
+      <li><strong>Ask for a review.</strong> Press Request review. You cannot approve your own change, so the demo offers "Demo: approve as" a teammate (in the kit, the teammate signs in and approves it). "How we review a post before it goes live" is waiting for your approval: approve it from the editor or the Staging page.</li>
+      <li><strong>Preview before anyone else sees it.</strong> Open Staging. Press Compare to see the live and staged versions side by side, then flip the whole site between Live site and Staging.</li>
+      <li><strong>Publish.</strong> Tick the changes you want and press Publish selected, or use Publish now in the editor. A change still in review cannot be published until someone approves it. You can also schedule a post for later.</li>
       <li><strong>Media.</strong> Upload an image in the media library (proposed; it stays in your browser, resized), add alt text, and use it as a featured image.</li>
       <li><strong>Team.</strong> Invite someone, change a role, turn someone's access off. Try to demote the last super admin: the kit refuses.</li>
       <li><strong>Audit log.</strong> Every step above is there, with who, what and when. Filter it and export a CSV.</li>
@@ -122,9 +128,9 @@
     <h2 id="scope">In the kit today, and what is proposed</h2>
     <p>Most of the demo mirrors code that is in the kit's source today. A few screens preview features that are proposed but not built yet; the demo marks each one <strong>Proposed</strong>.</p>
     <div class="facts">
-      <div class="fact"><strong>In the kit today</strong>Invite-only sign-in, two-factor and recovery codes, posts with drafts, scheduling, a per-post preview and local autosave, the rich-text editor, image upload, team management, the audit log with CSV export, and redirects.</div>
-      <div class="fact"><strong>Proposed, shown in the demo</strong>Staged edits on live posts, the whole-site staging preview with publish-selected, the media library page, resending or cancelling an invite, and the redirect tester with its extra checks.</div>
-      <div class="fact"><strong>Demo-only helpers</strong>The light and dark theme switch (the kit documents how to add it), viewing the admin as another role, and reset demo data.</div>
+      <div class="fact"><strong>In the kit today</strong>Invite-only sign-in, two-factor and recovery codes, posts with drafts, scheduling, a per-post preview and local autosave, the rich-text editor, image upload, staged edits on live posts with request review and approve, the staging page with compare and publish-selected, team management, the audit log with CSV export, and redirects.</div>
+      <div class="fact"><strong>Proposed, shown in the demo</strong>The media library page, resending or cancelling an invite, and the redirect tester with its extra checks.</div>
+      <div class="fact"><strong>Demo-only helpers</strong>The light and dark theme switch (the kit documents how to add it), viewing the admin as another role, approving as a teammate, and reset demo data.</div>
     </div>
   </section>
 
@@ -133,7 +139,7 @@
     <div class="facts">
       <div class="fact"><strong>Three security layers</strong>A proxy that checks the session, a server gate on every page and action, and Postgres row-level security as the final word.</div>
       <div class="fact"><strong>Real accounts</strong>Supabase Auth with invite-only sign-up, TOTP two-factor, bcrypt-hashed recovery codes and password reset.</div>
-      <div class="fact"><strong>One SQL file</strong>A single migration stands up the tables, policies, audit log and image bucket on a fresh Supabase project.</div>
+      <div class="fact"><strong>Two SQL files</strong>The first migration stands up the tables, policies, audit log and image bucket on a fresh Supabase project; the second adds staging and approval. The public site never reads a staged row.</div>
     </div>
   </section>
 

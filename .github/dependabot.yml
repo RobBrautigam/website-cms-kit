@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /source/supabase/tests
+    schedule:
+      interval: weekly
+    groups:
+      test-dependencies:
+        patterns:
+          - "*"

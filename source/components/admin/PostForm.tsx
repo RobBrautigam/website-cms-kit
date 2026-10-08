@@ -7,6 +7,9 @@ import PostEditor from './PostEditor'
 import PostMetaSidebar from './PostMetaSidebar'
 import type { PostMeta } from './PostMetaSidebar'
 import TipTapRenderer from '@/components/TipTapRenderer'
+import Link from 'next/link'
+import { publishNow, stageChanges } from '@/app/(admin)/admin/staging/actions'
+import { reviewLabel, type ReviewStatus } from '@/lib/staging/rules'
 
 const DEFAULT_AUTHOR_SLUG = 'jane-doe'
 
@@ -27,12 +30,18 @@ interface PostData {
 
 interface PostFormProps {
   initialData?: PostData
+  /** The post's staged copy, when it has one. initialData then carries the
+   *  staged content, so the editor opens on the staged copy. */
+  staged?: { id: string; reviewStatus: ReviewStatus } | null
 }
 
-export default function PostForm({ initialData }: PostFormProps) {
+export default function PostForm({ initialData, staged = null }: PostFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const isEditing = !!initialData?.id
+  // Edits to a live post go through staging (docs/10): "Stage changes" keeps
+  // the live post as it is; "Publish now" stages and publishes in one step.
+  const isLive = isEditing && initialData?.status === 'published'
   const [saving, setSaving] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -153,6 +162,39 @@ export default function PostForm({ initialData }: PostFormProps) {
     router.refresh()
   }
 
+  async function handleStage(andPublish: boolean) {
+    if (!initialData?.id) return
+    if (!meta.title.trim()) { alert('Title is required'); return }
+    if (!meta.slug.trim()) { alert('Slug is required'); return }
+
+    setSaving(true)
+    const content = {
+      title: meta.title,
+      slug: meta.slug,
+      excerpt: meta.excerpt,
+      meta_description: meta.metaDescription,
+      categories: meta.categories,
+      featured_image_url: meta.featuredImageUrl,
+      featured_image_alt: meta.featuredImageAlt,
+      body,
+      author_slug: meta.authorSlug || DEFAULT_AUTHOR_SLUG,
+    }
+    const result = andPublish
+      ? await publishNow(initialData.id, content)
+      : await stageChanges(initialData.id, content)
+
+    if (!result.ok) {
+      alert(result.error)
+      setSaving(false)
+      router.refresh()
+      return
+    }
+
+    localStorage.removeItem(storageKey)
+    router.push(andPublish ? '/admin/posts' : '/admin/staging')
+    router.refresh()
+  }
+
   function handleAIGenerated(data: {
     title: string
     slug: string
@@ -217,19 +259,84 @@ export default function PostForm({ initialData }: PostFormProps) {
           >
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : isEditing ? 'Update' : 'Save'}
-          </button>
+          {isLive ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleStage(false)}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-accent text-accent text-sm font-bold hover:bg-accent/5 transition-colors disabled:opacity-50"
+              >
+                Stage changes
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStage(true)}
+                disabled={saving}
+                className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Publish now'}
+              </button>
+            </>
+          ) : staged ? (
+            // A draft with a staged copy: the form holds the staged copy, so
+            // saving goes back to it. Writing the draft row here would be
+            // overwritten when the staged copy is published.
+            <button
+              type="button"
+              onClick={() => handleStage(false)}
+              disabled={saving}
+              className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save staged copy'}
+            </button>
+          ) : (
+            <>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => handleStage(false)}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg border border-accent text-accent text-sm font-bold hover:bg-accent/5 transition-colors disabled:opacity-50"
+                >
+                  Stage for publishing
+                </button>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : isEditing ? 'Update' : 'Save'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {staged && (
+        <div className="mb-4 p-3 rounded-lg border border-accent/30 bg-accent/5 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm text-text-secondary">
+            You are editing the staged copy ({reviewLabel(staged.reviewStatus)}). The live post stays as it is until
+            this is published. Changing it sends it back to Staged.
+          </span>
+          <Link href="/admin/staging" className="text-sm font-bold text-accent hover:underline">Open staging</Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
         <PostEditor content={body} onChange={setBody} key={editorKey} />
-        <PostMetaSidebar meta={meta} onChange={setMeta} />
+        <PostMetaSidebar
+          meta={meta}
+          onChange={setMeta}
+          statusLockedNote={
+            isLive
+              ? 'Live. To take it down, use the status badge on the posts list.'
+              : staged
+                ? 'Staged. Publish it from Staging, or discard the staged copy to change the status here.'
+                : undefined
+          }
+        />
       </div>
 
       {/* AI Generate Modal */}

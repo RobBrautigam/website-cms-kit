@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getStagedChange } from '@/lib/staging/queries'
 import PostForm from '@/components/admin/PostForm'
 
 export default async function EditPostPage({
@@ -24,21 +25,27 @@ export default async function EditPostPage({
 
   if (!post) notFound()
 
+  // When the post has a staged copy, the editor opens on it: the content
+  // comes from the staged row, the status and dates from the live post.
+  const staged = await getStagedChange(post.id)
+  const content = staged ?? post
+
   return (
     <PostForm
+      staged={staged ? { id: staged.id, reviewStatus: staged.review_status } : null}
       initialData={{
         id: post.id,
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt || '',
-        metaDescription: post.meta_description || '',
-        categories: post.categories || [],
-        featuredImageUrl: post.featured_image_url || '',
-        featuredImageAlt: post.featured_image_alt || '',
+        title: content.title,
+        slug: content.slug,
+        excerpt: content.excerpt || '',
+        metaDescription: content.meta_description || '',
+        categories: content.categories || [],
+        featuredImageUrl: content.featured_image_url || '',
+        featuredImageAlt: content.featured_image_alt || '',
         status: post.status,
         publishedAt: post.published_at ? new Date(post.published_at).toISOString().slice(0, 16) : '',
-        body: post.body,
-        authorSlug: post.author_slug || 'jane-doe',
+        body: content.body,
+        authorSlug: content.author_slug || 'jane-doe',
       }}
     />
   )

@@ -14,6 +14,7 @@ The non-negotiables. Most of these are easy to get subtly wrong and expensive to
 - [ ] **RLS is ENABLED on every table.** The migration does `alter table ... enable row level security` for all of them. If you add a table, enabling RLS is step one - a table with RLS off and a granted anon role is world-writable.
 - [ ] **Use the `SECURITY DEFINER` helpers, not inline subqueries, in policies.** `is_admin_or_above(auth.uid())` / `is_super_admin(auth.uid())` avoid the `user_roles` recursion trap and centralize the role logic. Don't hand-roll `exists (select ... from user_roles ...)` inside a content-table policy.
 - [ ] **Anon can only read PUBLIC rows.** Verify each content table's anon policy is scoped (`status = 'published'`, `is_active`, `is_visible`, `enabled`) and that there is NO anon insert/update/delete policy anywhere.
+- [ ] **Staged content stays private.** `blog_post_staged_changes` has no anon grant and no anon policy, and the public data layer (`lib/data.ts`) never reads it. Only `lib/staging/preview.ts` does, behind draft mode and an admin check, with the visitor's own session. Keep it that way: never read staged rows with the anon or service-role client on a public page. The database tests (`source/supabase/tests/`) check the public key is refused.
 - [ ] **Sensitive tables have no readable policy.** `admin_mfa_recovery_codes` has no RLS policy at all (service-role only). `admin_audit_log` is super-admin-read, no write policy (service-role append-only). Don't add a convenience read policy to either.
 
 ## Auth gates
@@ -84,4 +85,6 @@ export default {
 - [ ] Confirm a deactivated user is signed out on their next request.
 - [ ] Confirm a leaked-anon-key write attempt fails (try `supabase.from('blog_posts').insert(...)` from the browser console while signed out - it must be rejected by RLS).
 - [ ] Confirm you cannot demote/deactivate the last super-admin.
+- [ ] Confirm a signed-out browser cannot read a staged change (`supabase.from('blog_post_staged_changes').select()` with the public key must fail), that your public blog pages show the live post while a staged copy exists, and that `npm test` in `source/supabase/tests` passes.
+- [ ] Confirm the preview switch refuses a request from another site: a form on another origin posting to `/api/admin/preview` must get a 403, and copying the draft-mode cookie into a signed-out browser must show the live site.
 - [ ] Confirm the service-role key is absent from the client bundle (search the built JS for the key's first characters - it must not appear).

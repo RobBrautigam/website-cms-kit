@@ -39,6 +39,18 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 
 Open Supabase -> SQL Editor, paste the entire contents of `source/supabase/migrations/000_admin_cms_schema.sql`, and run it. This creates `user_roles`, the `SECURITY DEFINER` role helpers, all content tables with hardened RLS, the audit log, the MFA recovery-code store, and the `blog-images` Storage bucket with its write policies.
 
+Then run `source/supabase/migrations/001_staging_and_approval.sql` the same way. It adds the private `blog_post_staged_changes` table, its RLS, the review trigger and `publish_staged_posts()` ([docs/10](10-staging-and-approval.md)). Both files are safe to run again.
+
+To check both migrations before you touch a real project, run the database tests on an in-memory Postgres (Node 22.18 or later, no Supabase project or Docker needed):
+
+```bash
+cd source/supabase/tests
+npm install
+npm test
+```
+
+All tests should pass. The same suite runs against your own changes: if you edit a policy or the trigger, a broken rule shows up as a failing test.
+
 ## 4. Check the Storage bucket
 
 The migration creates the bucket (section 9 of the SQL file). Open Supabase -> Storage and confirm it reads:

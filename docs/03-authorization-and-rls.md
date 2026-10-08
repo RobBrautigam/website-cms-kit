@@ -67,6 +67,10 @@ So: the public sees only published rows; admins see and mutate everything; a lea
 
 `user_roles` itself: a user may read their own row OR (if super-admin) all rows; only super-admins may write. `admin_audit_log`: super-admins may read; nobody may write through RLS (writes go through the service-role client only - append-only by construction). `admin_mfa_recovery_codes`: NO policies at all, so even the owner cannot read their own hashes except through the service-role helper.
 
+### Private tables: staged changes
+
+`blog_post_staged_changes` (migration 001, [docs/10](10-staging-and-approval.md)) breaks the five-policy pattern on purpose: it has the four admin policies and **no anon read policy**, plus `revoke all ... from public, anon`, so a request with the public key is refused before any policy runs. Its restrictive `blog_post_staged_changes_require_mfa` policy applies the two-factor rule, and a trigger enforces the review states, so the rules hold for a browser-side write as much as for a server action. Publishing goes through `publish_staged_posts()`, which runs with the caller's own rights (`SECURITY INVOKER`), so every check above still applies to it. Use the same shape for any table that must never reach the public site.
+
 ## The audit log (`source/lib/auth/audit.ts`)
 
 Every sensitive mutation records a row in `admin_audit_log` via `recordAdminAction()`. It captures the actor (user id + email + role), the action (a typed union like `blog_post.publish`, `user.role_change`), the resource, a JSON payload, plus IP and user-agent. It is best-effort (a failed audit insert logs but never breaks the mutation) and uses the service-role client. The `/admin/audit-log` page (super-admin only) renders and filters it and exports CSV.
