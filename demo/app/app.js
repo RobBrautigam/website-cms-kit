@@ -12,10 +12,10 @@
 (function () {
   'use strict';
 
-  var STORE_KEY = 'cmskit-demo-v1';
+  var STORE_KEY = 'cmskit-demo-v2';
   var THEME_KEY = 'cmskit-demo-theme';
   var SESSION_KEY = 'cmskit-demo-session';
-  var DEMO_VERSION = 'v1.1.0 demo';
+  var DEMO_VERSION = 'v1.2.0 demo';
   var DEMO_TOTP = '123456';
   var CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
   var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -107,7 +107,8 @@
     moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-    play: '<path d="m6 3 14 9-14 9V3z"/>'
+    play: '<path d="m6 3 14 9-14 9V3z"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>'
   };
   function icon(name, label) {
     var a11y = label ? ' role="img" aria-label="' + esc(label) + '"' : ' aria-hidden="true" focusable="false"';
@@ -147,6 +148,8 @@
       var content = { title: o.title, slug: slugify(o.title), excerpt: o.excerpt, metaDescription: o.meta || o.excerpt, category: o.category, cover: o.cover || '', body: o.body };
       var rec = { id: uid(), status: o.status, author: o.author, createdAt: daysAgo(o.age + 2), updatedAt: daysAgo(o.age, o.hours || 0), publishedAt: o.status === 'published' ? daysAgo(o.age) : null, publishAt: o.publishAt || null, draft: content, live: o.status === 'published' ? clone(content) : null };
       if (o.pending) { rec.draft = clone(content); rec.draft.title = o.pending.title || content.title; rec.draft.excerpt = o.pending.excerpt || content.excerpt; rec.draft.body = o.pending.body || content.body; rec.updatedAt = daysAgo(0, 2); }
+      // The staged copy's review state, as in migration 001 (null: nothing staged).
+      rec.review = o.review ? { status: o.review.status, stagedBy: o.review.stagedBy, stagedAt: daysAgo(0, o.review.hours || 2), requestedBy: o.review.requestedBy || null, approvedBy: o.review.approvedBy || null } : null;
       return rec;
     }
     var posts = [
@@ -156,10 +159,14 @@
       post({ title: 'How we review a post before it goes live', status: 'published', category: 'Guides', author: 'Jordan Blake', age: 6, cover: media[1].src,
         excerpt: 'Draft, staging preview, publish: the three steps every change takes.',
         body: doc(p('Every change starts as a draft. Drafts are visible only inside the admin.'), h(2, 'Preview the whole site'), p('The staging preview shows the site exactly as it will look once the change is published, next to the live version.'), h(2, 'Publish, then verify'), p('Publishing writes an audit-log entry with who, what and when, so there is never a question about where a change came from.')),
-        pending: { title: 'How we review a post before it goes live (updated checklist)', excerpt: 'Draft, staging preview, approve, publish: the four steps every change takes.' } }),
+        pending: { title: 'How we review a post before it goes live (updated checklist)', excerpt: 'Draft, staging preview, approve, publish: the four steps every change takes.' },
+        review: { status: 'in_review', stagedBy: 'Jordan Blake', requestedBy: 'Jordan Blake', hours: 2 } }),
       post({ title: 'Release notes: faster image uploads', status: 'published', category: 'Product', author: 'Avery Park', age: 11, cover: media[2].src,
         excerpt: 'Images now upload in the background and are resized before they leave the browser.',
-        body: doc(p('Uploads are now checked for type and size before they start, and large images are resized on the way in.'), ul(['JPEG, PNG, WebP and GIF', 'Up to 5 MB per file', 'Alt text on every image'])) }),
+        body: doc(p('Uploads are now checked for type and size before they start, and large images are resized on the way in.'), ul(['JPEG, PNG, WebP and GIF', 'Up to 5 MB per file', 'Alt text on every image'])),
+        pending: { title: 'Release notes: faster image uploads and alt text reminders', excerpt: 'Images upload in the background, are resized before they leave the browser, and now ask for alt text.',
+          body: doc(p('Uploads are now checked for type and size before they start, and large images are resized on the way in.'), ul(['JPEG, PNG, WebP and GIF', 'Up to 5 MB per file', 'Alt text on every image']), h(2, 'New: alt text reminders'), p('The editor now asks for alt text before an image is saved, so no image goes live without one.')) },
+        review: { status: 'staged', stagedBy: 'Avery Park', hours: 1 } }),
       post({ title: 'Writing alt text that actually helps', status: 'published', category: 'Guides', author: 'Sam Ortiz', age: 15, cover: media[3].src,
         excerpt: 'Describe what the image does for the reader, not every pixel in it.',
         body: doc(p('Good alt text is short and specific. If the image is decorative, say so by leaving it empty.'), h(3, 'A quick test'), p('Read the paragraph aloud with the alt text in place of the image. If it still makes sense, the alt text works.')) }),
@@ -171,7 +178,8 @@
         body: doc(p('A redesign that drops old addresses loses the links other sites gave you. A redirect map keeps them.'), ul(['Export every old path', 'Match each to its new page', 'Use permanent redirects for moved pages']), p('The Redirects screen tests each rule before it goes live.')) }),
       post({ title: 'Draft: questions to ask before you pick a CMS', status: 'draft', category: 'Guides', author: 'Sam Ortiz', age: 0, hours: 5,
         excerpt: 'Who edits, how often, and what needs approval decide more than any feature list.',
-        body: doc(p('Start with the people: who writes, who approves, and who fixes things when they break.'), p('Then the cadence, then the features.')) }),
+        body: doc(p('Start with the people: who writes, who approves, and who fixes things when they break.'), p('Then the cadence, then the features.')),
+        review: { status: 'approved', stagedBy: 'Sam Ortiz', requestedBy: 'Sam Ortiz', approvedBy: 'Jordan Blake', hours: 4 } }),
       post({ title: 'Draft: spring open house recap', status: 'draft', category: 'News', author: 'Jordan Blake', age: 1, hours: 3,
         excerpt: '', body: doc(p('Notes from the open house go here.')) })
     ];
@@ -191,7 +199,12 @@
     function a(who, action, type, id, payload, d, hr) { return { id: uid(), at: daysAgo(d, hr), actor: who.email, role: who.role, action: action, resourceType: type, resourceId: id, payload: payload || {}, ip: '203.0.113.' + (10 + Math.floor(Math.random() * 80)) }; }
     var audit = [
       a(me, 'auth.login_success', 'session', '', {}, 0, 1),
-      a(team[1], 'blog_post.update', 'blog_post', posts[1].id, { title: posts[1].draft.title }, 0, 2),
+      a(me, 'blog_post.stage', 'blog_post', posts[2].id, { title: posts[2].draft.title, slug: posts[2].draft.slug, created: true }, 0, 1),
+      a(team[1], 'blog_post.approve', 'blog_post', posts[6].id, { title: posts[6].draft.title, staged_by: team[2].email }, 0, 3),
+      a(team[1], 'blog_post.request_review', 'blog_post', posts[1].id, { title: posts[1].draft.title }, 0, 2),
+      a(team[1], 'blog_post.stage', 'blog_post', posts[1].id, { title: posts[1].draft.title, slug: posts[1].draft.slug, created: true }, 0, 2),
+      a(team[2], 'blog_post.request_review', 'blog_post', posts[6].id, { title: posts[6].draft.title }, 0, 4),
+      a(team[2], 'blog_post.stage', 'blog_post', posts[6].id, { title: posts[6].draft.title, slug: posts[6].draft.slug, created: true }, 0, 4),
       a(team[2], 'blog_post.create', 'blog_post', posts[6].id, { title: posts[6].draft.title }, 0, 5),
       a(me, 'blog_post.schedule', 'blog_post', posts[5].id, { publish_at: posts[5].publishAt }, 1, 0),
       a(team[1], 'blog_post.create', 'blog_post', posts[7].id, { title: posts[7].draft.title }, 1, 3),
@@ -201,7 +214,8 @@
       a(me, 'user.deactivate', 'user', team[3].id, { email: team[3].email }, 38, 0),
       a(team[1], 'auth.mfa.enrolled', 'user', team[1].id, {}, 60, 0)
     ];
-    return { version: 1, posts: posts, media: media, team: team, redirects: redirects, audit: audit, meId: me.id, viewAs: 'super_admin', mfaCodes: recoveryCodes(), mfaEnabled: true, categories: ['Guides', 'Product', 'News', 'Company'] };
+    audit.sort(function (x, y) { return y.at.localeCompare(x.at); });
+    return { version: 2, posts: posts, media: media, team: team, redirects: redirects, audit: audit, meId: me.id, viewAs: 'super_admin', mfaCodes: recoveryCodes(), mfaEnabled: true, categories: ['Guides', 'Product', 'News', 'Company'] };
   }
 
   // ------------------------------------------------------------- the store
@@ -209,7 +223,7 @@
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      if (raw) { var d = JSON.parse(raw); if (d && d.version === 1 && Array.isArray(d.posts)) return d; }
+      if (raw) { var d = JSON.parse(raw); if (d && d.version === 2 && Array.isArray(d.posts)) return d; }
     } catch (e) { /* corrupt or blocked: fall through to fresh sample data */ }
     var fresh = seed();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(fresh)); } catch (e) { /* storage blocked: run in memory */ }
@@ -276,8 +290,54 @@
     if (p.status === 'published') return p.live && !same(p.live, p.draft) ? 'changed' : 'published';
     return p.status;
   }
-  var STATE_LABEL = { published: 'Published', changed: 'Changes pending', draft: 'Draft', scheduled: 'Scheduled' };
+  var STATE_LABEL = { published: 'Published', changed: 'Staged changes', draft: 'Draft', scheduled: 'Scheduled' };
   function chip(state, label) { return '<span class="chip chip-' + esc(state) + '">' + esc(label || STATE_LABEL[state] || state) + '</span>'; }
+
+  // Staging and approval: the same rules as the kit's lib/staging/rules.ts
+  // and migration 001. A published post's edits are its staged copy; a draft
+  // is staged only when someone chooses "Stage for publishing".
+  var REVIEW_LABEL = { staged: 'Staged', in_review: 'In review', approved: 'Approved' };
+  var REVIEW_CHIP = { staged: 'changed', in_review: 'scheduled', approved: 'published' };
+  function reviewOf(p) {
+    var s = postState(p);
+    if (s === 'changed') return p.review || { status: 'staged', stagedBy: p.author, stagedAt: p.updatedAt, requestedBy: null, approvedBy: null };
+    if (s === 'draft' && p.review) return p.review;
+    return null;
+  }
+  function reviewChip(r) { return chip(REVIEW_CHIP[r.status], REVIEW_LABEL[r.status]); }
+  function canPublishReview(r) { return !r || r.status !== 'in_review'; }
+  function canApprove(r) { return !!r && r.status === 'in_review' && r.stagedBy !== me().name; }
+  function reviewLine(r) {
+    var who = function (n) { return n === me().name ? 'you' : n; };
+    if (r.status === 'in_review') return 'Staged by ' + who(r.stagedBy) + '. Review asked by ' + who(r.requestedBy || r.stagedBy) + '.';
+    if (r.status === 'approved') return 'Staged by ' + who(r.stagedBy) + '. Approved by ' + who(r.approvedBy) + '.';
+    return 'Staged by ' + who(r.stagedBy) + '.';
+  }
+  function teammate() { return db.team.filter(function (u) { return u.id !== db.meId && u.status === 'active'; })[0]; }
+  // A content edit sends any review back to Staged, staged by whoever edited.
+  function restage(p) {
+    var r = p.review;
+    if (r && r.status === 'staged' && r.stagedBy === me().name) return;
+    p.review = { status: 'staged', stagedBy: me().name, stagedAt: nowIso(), requestedBy: null, approvedBy: null };
+    audit('blog_post.stage', 'blog_post', p.id, { title: p.draft.title, slug: p.draft.slug, created: !r });
+  }
+  function setReview(p, to, actorName) {
+    var r = reviewOf(p); if (!r) return;
+    var from = r.status;
+    if (to === 'in_review') { p.review = { status: 'in_review', stagedBy: r.stagedBy, stagedAt: r.stagedAt, requestedBy: me().name, approvedBy: null }; audit('blog_post.request_review', 'blog_post', p.id, { title: p.draft.title }); }
+    else if (to === 'approved') {
+      var by = actorName || me().name;
+      p.review = { status: 'approved', stagedBy: r.stagedBy, stagedAt: r.stagedAt, requestedBy: r.requestedBy, approvedBy: by };
+      var actor = db.team.filter(function (u) { return u.name === by; })[0] || me();
+      db.audit.unshift({ id: uid(), at: nowIso(), actor: actor.email, role: actor.role, action: 'blog_post.approve', resourceType: 'blog_post', resourceId: p.id, payload: { title: p.draft.title, staged_by: r.stagedBy }, ip: '203.0.113.7' });
+    } else { p.review = { status: 'staged', stagedBy: r.stagedBy, stagedAt: r.stagedAt, requestedBy: null, approvedBy: null }; audit('blog_post.withdraw_review', 'blog_post', p.id, { title: p.draft.title, from: from }); }
+    p.updatedAt = nowIso();
+  }
+  function discardStage(p) {
+    audit('blog_post.discard_staged', 'blog_post', p.id, { title: p.draft.title });
+    if (p.live) p.draft = clone(p.live);
+    p.review = null; p.updatedAt = nowIso();
+  }
   function findPost(id) { return db.posts.filter(function (p) { return p.id === id; })[0]; }
   function wordCount(text) { var m = String(text || '').trim().match(/\S+/g); return m ? m.length : 0; }
   function docText(node) {
@@ -286,9 +346,12 @@
     return (node.content || []).map(docText).join(' ');
   }
   function slugTaken(slug, exceptId) { return db.posts.some(function (p) { return p.id !== exceptId && (p.draft.slug === slug || (p.live && p.live.slug === slug)); }); }
-  function publishPost(p, how) {
-    p.live = clone(p.draft); p.status = 'published'; p.publishAt = null; p.publishedAt = nowIso(); p.updatedAt = nowIso();
-    audit(how || 'blog_post.publish', 'blog_post', p.id, { title: p.draft.title });
+  function publishPost(p, how, batch) {
+    var r = reviewOf(p), wasLive = p.status === 'published' && p.publishedAt;
+    p.live = clone(p.draft); p.status = 'published'; p.publishAt = null; if (!wasLive) p.publishedAt = nowIso(); p.updatedAt = nowIso();
+    if (r) audit('blog_post.publish_staged', 'blog_post', p.id, { title: p.draft.title, slug: p.draft.slug, review_status: r.status, approved_by: r.approvedBy, batch: batch || 1 });
+    else audit(how || 'blog_post.publish', 'blog_post', p.id, { title: p.draft.title });
+    p.review = null;
   }
   function publishProblems(p) {
     var errs = [];
@@ -371,7 +434,7 @@
     { title: 'Content', items: [
       { id: 'posts', label: 'Posts', icon: 'posts' },
       { id: 'media', label: 'Media', icon: 'image', proposed: true },
-      { id: 'site', label: 'Site preview', icon: 'globe', proposed: true, badge: function () { return stagedChanges().length; } }
+      { id: 'staging', label: 'Staging', icon: 'globe', badge: function () { return stagedChanges().length; } }
     ] },
     { title: 'Site', items: [{ id: 'redirects', label: 'Redirects', icon: 'redirect' }] },
     { title: 'Organization', items: [{ id: 'team', label: 'Team', icon: 'users', superOnly: true }] },
@@ -627,14 +690,13 @@
     var counts = { published: 0, draft: 0, scheduled: 0, changed: 0 };
     db.posts.forEach(function (p) { var s = postState(p); counts[s] = (counts[s] || 0) + 1; if (s === 'changed') counts.published++; });
     shell('posts',
-      head('Posts', 'Write, review and publish blog posts.', '<a class="btn btn-primary" href="#/posts/new">' + icon('plus') + 'New post</a>') +
-      proposedNote('The "Changes pending" state (edits to a live post waiting to be published) is part of the proposed staging feature. In the kit today, saving a published post updates it live.', 'Partly proposed.') +
+      head('Posts', 'Write, review and publish blog posts. Edits to a live post wait in staging until someone publishes them.', '<a class="btn btn-primary" href="#/posts/new">' + icon('plus') + 'New post</a>') +
       '<div class="stats">' +
-        stat(counts.published, 'Published') + stat(counts.changed, 'Changes pending') + stat(counts.draft, 'Drafts') + stat(counts.scheduled, 'Scheduled') +
+        stat(counts.published, 'Published') + stat(counts.changed, 'Staged changes') + stat(counts.draft, 'Drafts') + stat(counts.scheduled, 'Scheduled') +
       '</div>' +
       '<div class="filters" role="search">' +
         '<div class="search">' + icon('search') + '<label class="sr-only" for="pq">Search posts</label><input class="input" id="pq" type="search" placeholder="Search title, excerpt or URL" value="' + esc(postFilters.q) + '"></div>' +
-        '<label class="sr-only" for="pstatus">Status</label><select class="input" id="pstatus">' + opts([['all', 'All statuses'], ['published', 'Published'], ['changed', 'Changes pending'], ['draft', 'Draft'], ['scheduled', 'Scheduled']], postFilters.status) + '</select>' +
+        '<label class="sr-only" for="pstatus">Status</label><select class="input" id="pstatus">' + opts([['all', 'All statuses'], ['published', 'Published'], ['changed', 'Staged changes'], ['draft', 'Draft'], ['scheduled', 'Scheduled']], postFilters.status) + '</select>' +
         '<label class="sr-only" for="pcat">Category</label><select class="input" id="pcat">' + opts([['all', 'All categories']].concat(db.categories.map(function (c) { return [c, c]; })), postFilters.category) + '</select>' +
         '<label class="sr-only" for="psort">Sort</label><select class="input" id="psort">' + opts([['updated', 'Last updated'], ['oldest', 'Oldest first'], ['az', 'Title A to Z'], ['za', 'Title Z to A']], postFilters.sort) + '</select>' +
       '</div>' +
@@ -665,9 +727,11 @@
         var pubBtn = (s === 'published' || s === 'changed')
           ? '<button type="button" class="icon-btn" data-act="unpublish" data-id="' + esc(p.id) + '" aria-label="Unpublish ' + esc(title) + '" title="Unpublish">' + icon('eyeoff') + '</button>'
           : '<button type="button" class="icon-btn" data-act="publish" data-id="' + esc(p.id) + '" aria-label="Publish ' + esc(title) + '" title="Publish now">' + icon('send') + '</button>';
+        var r = reviewOf(p);
+        var staged = r ? ' <a class="staged-link" href="#/staging" title="Waiting in staging: the live post is unchanged">' + reviewChip(r) + '</a>' : '';
         return '<tr>' +
-          '<td class="title-cell"><a href="#/posts/' + esc(p.id) + '">' + esc(title) + '</a><div class="sub mono">/blog/' + esc(p.draft.slug || '') + '</div><div class="col-narrow mt-4">' + chip(s) + '</div></td>' +
-          '<td class="col-wide">' + chip(s) + '</td>' +
+          '<td class="title-cell"><a href="#/posts/' + esc(p.id) + '">' + esc(title) + '</a><div class="sub mono">/blog/' + esc(p.draft.slug || '') + '</div><div class="col-narrow mt-4">' + chip(s) + staged + '</div></td>' +
+          '<td class="col-wide">' + chip(s) + staged + '</td>' +
           '<td class="col-opt">' + esc(p.draft.category || '') + '</td>' +
           '<td class="col-opt"><span class="sub">' + esc(when) + '</span></td>' +
           '<td class="actions">' +
@@ -693,10 +757,11 @@
       var title = p.draft.title || 'Untitled post';
       if (act === 'publish') {
         var errs = publishProblems(p);
+        if (!canPublishReview(reviewOf(p))) errs.push('It is waiting in review: a teammate approves it first.');
         if (errs.length) { toast('Cannot publish yet: ' + errs.join(' '), 'err'); return; }
         confirmDialog({ title: 'Publish this post?', desc: '<strong>' + esc(title) + '</strong> goes live on the public site.', confirm: 'Publish', onConfirm: function () { publishPost(p); save(); toast('Published: ' + title); rows(); refreshBadges(); } });
       } else if (act === 'unpublish') {
-        confirmDialog({ title: 'Unpublish this post?', desc: '<strong>' + esc(title) + '</strong> is taken off the public site and kept as a draft.', confirm: 'Unpublish', onConfirm: function () { p.live = null; p.status = 'draft'; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: title }); save(); toast('Moved to drafts: ' + title); rows(); refreshBadges(); } });
+        confirmDialog({ title: 'Unpublish this post?', desc: '<strong>' + esc(title) + '</strong> is taken off the public site and kept as a draft.', confirm: 'Unpublish', onConfirm: function () { p.live = null; p.status = 'draft'; p.review = null; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: title }); save(); toast('Moved to drafts: ' + title); rows(); refreshBadges(); } });
       } else if (act === 'duplicate') {
         var c = clone(p); c.id = uid(); c.status = 'draft'; c.live = null; c.publishAt = null; c.publishedAt = null; c.createdAt = nowIso(); c.updatedAt = nowIso(); c.author = me().name;
         c.draft.title = 'Copy of ' + p.draft.title; var base = slugify(c.draft.title), slug = base, n = 2; while (slugTaken(slug, c.id)) slug = base + '-' + (n++); c.draft.slug = slug;
@@ -709,8 +774,8 @@
   function stat(n, l) { return '<div class="stat"><div class="n">' + esc(n) + '</div><div class="l">' + esc(l) + '</div></div>'; }
   function opts(list, sel) { return list.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === sel ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join(''); }
   function refreshBadges() {
-    $all('.sb-link[href="#/site"] .count').forEach(function (el) { el.remove(); });
-    var n = stagedChanges().length, link = $('.sb-link[href="#/site"]');
+    $all('.sb-link[href="#/staging"] .count').forEach(function (el) { el.remove(); });
+    var n = stagedChanges().length, link = $('.sb-link[href="#/staging"]');
     if (n && link) link.insertAdjacentHTML('beforeend', '<span class="count"><span aria-hidden="true">' + esc(n) + '</span><span class="sr-only">' + esc(plural(n, 'staged change', 'staged changes')) + '</span></span>');
   }
 
@@ -828,6 +893,10 @@
         history.replaceState(null, '', '#/posts/' + p.id); current.path = '/posts/' + p.id;
       }
       p.updatedAt = nowIso();
+      // Edits to a live post are its staged copy; any edit resets a review.
+      var st = postState(p);
+      if (st === 'changed' || (st === 'draft' && p.review)) restage(p);
+      else if (st === 'published') p.review = null;
       if (save()) { $('#save-state').classList.remove('saving'); $('#save-text').textContent = 'Saved in this browser ' + ago(p.updatedAt); }
       renderPub(); refreshBadges();
     }
@@ -880,16 +949,31 @@
       $('#ed-chip').innerHTML = chip(s);
       var box = '<div>';
       if (s === 'scheduled') box += '<p class="hint">Goes live ' + esc(dateTimeLabel(p.publishAt)) + '.</p>';
-      if (s === 'published') box += '<p class="hint">Live since ' + esc(dateLabel(p.publishedAt)) + '. Edits stay in draft until you publish them.</p>';
-      if (s === 'changed') box += '<p class="hint">The live site shows the last published version. Your edits are staged. <span class="tag-proposed" title="A proposed feature: in the kit today, saving a published post updates it live">Proposed</span></p>';
-      if (s === 'draft') box += '<p class="hint">Only signed-in admins can see drafts.</p>';
+      var r = p._unsaved ? null : reviewOf(p);
+      if (s === 'published') box += '<p class="hint">Live since ' + esc(dateLabel(p.publishedAt)) + '. Edit away: your edits are staged and the live post stays as it is until you publish them.</p>';
+      if (s === 'changed') box += '<p class="hint">The live site shows the last published version. Your edits are saved as a staged change.</p>';
+      if (s === 'draft') box += '<p class="hint">Only signed-in admins can see drafts.' + (r ? ' This draft is staged for publishing.' : '') + '</p>';
+      if (r) box += '<p class="review-line">' + reviewChip(r) + ' <span class="hint">' + esc(reviewLine(r)) + '</span></p>';
+      if (r && r.status === 'in_review') box += '<p class="hint">' + (canApprove(r) ? 'A teammate asked you to review this change.' : 'Waiting for a teammate to approve it. You cannot approve a change you staged.') + '</p>';
       box += '</div><div class="stack">';
-      var primary = s === 'changed' ? 'Publish changes' : (s === 'published' ? 'Published' : 'Publish now');
-      box += '<button type="button" class="btn btn-primary" data-act="ed-publish"' + (s === 'published' ? ' disabled' : '') + '>' + icon('send') + esc(primary) + '</button>';
+      var primary = s === 'published' ? 'Published' : 'Publish now';
+      var blocked = s === 'published' || !canPublishReview(r);
+      box += '<button type="button" class="btn btn-primary" data-act="ed-publish"' + (blocked ? ' disabled' : '') + '>' + icon('send') + esc(primary) + '</button>';
+      if (r) {
+        box += '<div class="row">';
+        if (r.status === 'staged') box += '<button type="button" class="btn btn-outline btn-sm" data-act="ed-request">Request review</button>';
+        if (r.status === 'in_review') box += '<button type="button" class="btn btn-outline btn-sm" data-act="ed-approve"' + (canApprove(r) ? '' : ' disabled') + '>' + icon('check') + 'Approve</button>';
+        if (r.status === 'in_review' && !canApprove(r) && teammate()) box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-approve-demo" title="Demo only: in the kit, your teammate signs in and approves">Demo: approve as ' + esc(teammate().name) + '</button>';
+        if (r.status !== 'staged') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-withdraw">' + (r.status === 'approved' ? 'Take back approval' : 'Withdraw request') + '</button>';
+        box += '</div>';
+      }
       box += '<div class="row">';
       box += '<a class="btn btn-outline btn-sm" href="#/preview/' + esc(p.id) + '"' + (p._unsaved ? ' aria-disabled="true" data-act="need-save"' : '') + '>' + icon('eye') + 'Preview</a>';
+      if (s === 'draft' && !r && !p._unsaved) box += '<button type="button" class="btn btn-outline btn-sm" data-act="ed-stage">Stage for publishing</button>';
       if (s === 'draft' || s === 'scheduled') box += '<button type="button" class="btn btn-outline btn-sm" data-act="ed-schedule">' + icon('calendar') + (s === 'scheduled' ? 'Reschedule' : 'Schedule') + '</button>';
+      if (r) box += '<a class="btn btn-ghost btn-sm" href="#/staging">Open staging</a>';
       if (s === 'changed') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-discard">Discard changes</button>';
+      if (s === 'draft' && r) box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-unstage">Remove from staging</button>';
       if (s === 'published' || s === 'changed') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-unpublish">Unpublish</button>';
       if (s === 'scheduled') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-unschedule">Back to draft</button>';
       box += '</div></div>';
@@ -904,17 +988,36 @@
         if (timer) { clearTimeout(timer); persist(); }
         if (p._unsaved) { toast('Add a title and some text first.', 'err'); return; }
         var errs = publishProblems(p);
+        if (!canPublishReview(reviewOf(p))) errs.push('It is waiting in review: a teammate approves it first.');
         if (errs.length) { toast('Cannot publish yet: ' + errs.join(' '), 'err'); return; }
         var st = postState(p);
-        confirmDialog({ title: st === 'changed' ? 'Publish these changes?' : 'Publish this post?', desc: 'The public site will show <strong>' + esc(p.draft.title) + '</strong> as it looks in the preview.', confirm: st === 'changed' ? 'Publish changes' : 'Publish', onConfirm: function () { publishPost(p, st === 'changed' ? 'blog_post.publish_changes' : 'blog_post.publish'); save(); toast('Published: ' + p.draft.title); renderPub(); refreshBadges(); } });
+        confirmDialog({ title: st === 'changed' ? 'Publish these changes?' : 'Publish this post?', desc: 'The public site will show <strong>' + esc(p.draft.title) + '</strong> as it looks in the preview.', confirm: st === 'changed' ? 'Publish changes' : 'Publish', onConfirm: function () { publishPost(p); save(); toast('Published: ' + p.draft.title); renderPub(); refreshBadges(); } });
+      } else if (act === 'ed-stage') {
+        if (timer) { clearTimeout(timer); persist(); }
+        var se = publishProblems(p);
+        if (se.length) { toast('Cannot stage yet: ' + se.join(' '), 'err'); return; }
+        restage(p); p.updatedAt = nowIso(); save(); toast('Staged for publishing. It waits in staging until someone publishes it.'); renderPub(); refreshBadges();
+      } else if (act === 'ed-request') {
+        if (timer) { clearTimeout(timer); persist(); }
+        setReview(p, 'in_review'); save(); toast('Review requested. A teammate approves it before it can be published.'); renderPub(); refreshBadges();
+      } else if (act === 'ed-approve') {
+        if (!canApprove(reviewOf(p))) { toast('You cannot approve a change you staged. Ask a teammate to approve it.', 'err'); return; }
+        setReview(p, 'approved'); save(); toast('Approved. Anyone can publish it now.'); renderPub(); refreshBadges();
+      } else if (act === 'ed-approve-demo') {
+        var tm = teammate(); if (!tm) return;
+        setReview(p, 'approved', tm.name); save(); toast('Approved by ' + tm.name + ' (demo). Anyone can publish it now.'); renderPub(); refreshBadges();
+      } else if (act === 'ed-withdraw') {
+        setReview(p, 'staged'); save(); toast('Moved back to staged.'); renderPub(); refreshBadges();
+      } else if (act === 'ed-unstage') {
+        confirmDialog({ title: 'Remove this draft from staging?', desc: 'It stays a draft. Nothing changes on the public site.', confirm: 'Remove from staging', onConfirm: function () { discardStage(p); save(); toast('Removed from staging.'); renderPub(); refreshBadges(); } });
       } else if (act === 'ed-schedule') {
         if (timer) { clearTimeout(timer); persist(); }
         if (p._unsaved) { toast('Add a title and some text first.', 'err'); return; }
         scheduleDialog(p, function () { renderPub(); refreshBadges(); });
       } else if (act === 'ed-discard') {
-        confirmDialog({ title: 'Discard your changes?', desc: 'The post goes back to the version that is live now.', confirm: 'Discard changes', danger: true, onConfirm: function () { p.draft = clone(p.live); p.updatedAt = nowIso(); audit('blog_post.discard_changes', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Changes discarded.'); render(true); } });
+        confirmDialog({ title: 'Discard your changes?', desc: 'The staged copy is deleted. The post goes back to the version that is live now.', confirm: 'Discard changes', danger: true, onConfirm: function () { discardStage(p); save(); toast('Changes discarded.'); render(true); } });
       } else if (act === 'ed-unpublish') {
-        confirmDialog({ title: 'Unpublish this post?', desc: 'It comes off the public site and stays here as a draft.', confirm: 'Unpublish', onConfirm: function () { p.live = null; p.status = 'draft'; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Moved to drafts.'); renderPub(); refreshBadges(); } });
+        confirmDialog({ title: 'Unpublish this post?', desc: 'It comes off the public site and stays here as a draft.', confirm: 'Unpublish', onConfirm: function () { p.live = null; p.status = 'draft'; p.review = null; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Moved to drafts.'); renderPub(); refreshBadges(); } });
       } else if (act === 'ed-unschedule') {
         p.status = 'draft'; p.publishAt = null; p.updatedAt = nowIso(); audit('blog_post.unschedule', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Back to draft.'); renderPub(); refreshBadges();
       } else if (act === 'ed-delete') {
@@ -953,7 +1056,7 @@
     var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     openModal({
       title: 'Schedule this post',
-      desc: 'It goes live on its own at the time you pick (your local time). Until then it shows in the staging preview.',
+      desc: 'It goes live on its own at the time you pick (your local time). Until then only signed-in admins see it.',
       body: '<div class="field"><label class="lbl" for="when">Publish at</label><input class="input" id="when" type="datetime-local" value="' + esc(local) + '"><p class="hint err" id="when-err" role="alert"></p></div>',
       actions: '<button type="button" class="btn btn-outline" data-close>Cancel</button><button type="submit" class="btn btn-primary">Schedule</button>',
       onSubmit: function (f, close) {
@@ -976,7 +1079,7 @@
     var s = postState(p);
     shell('posts',
       '<a class="backlink" href="#/posts/' + esc(p.id) + '">' + icon('back') + 'Back to the editor</a>' +
-      head('Preview', 'How this post will look on the site. ' + chip(s), '<a class="btn btn-outline" href="#/site">' + icon('globe') + 'Preview the whole site</a>') +
+      head('Preview', 'How this post will look on the site. ' + chip(s), '<a class="btn btn-outline" href="#/staging">' + icon('globe') + 'Preview the whole site</a>') +
       '<div class="site-frame"><div class="preview-banner">Preview: ' + esc(STATE_LABEL[s]) + '. Visitors ' + (s === 'published' ? 'see this version now.' : 'do not see this version yet.') + '</div>' +
       '<div class="site"><div class="site-body">' + articleHtml(p.draft, p) + '</div></div></div>'
     );
@@ -994,41 +1097,52 @@
   function stagedChanges() {
     var out = [];
     db.posts.forEach(function (p) {
-      var s = postState(p);
-      if (s === 'changed') out.push({ p: p, kind: 'Edited', note: 'Changes to a live post' });
-      else if (s === 'scheduled') out.push({ p: p, kind: 'Scheduled', note: 'Goes live ' + dateTimeLabel(p.publishAt) });
-      else if (s === 'draft' && p.draft.title.trim()) out.push({ p: p, kind: 'New', note: 'Draft, never published' });
+      var r = reviewOf(p);
+      if (!r) return;
+      out.push({ p: p, r: r, kind: p.live ? 'Edited' : 'New', note: p.live ? 'Changes to a live post' : 'A draft, staged to go live' });
     });
     return out;
   }
-  var siteState = { mode: 'staging', page: 'home', postId: null };
+  var siteState = { mode: 'staging', page: 'home', postId: null, compare: null };
   function viewSite() {
-    setTitle('Site preview');
+    setTitle('Staging');
     var changes = stagedChanges();
-    shell('site',
-      head('Site preview', 'See the whole site with your staged changes before anyone else does.') +
-      proposedNote('In the kit today each post has its own preview, and saving a published post updates it live. This page shows what a staging step for the whole site could look like.') +
+    if (!changes.some(function (c) { return c.p.id === siteState.compare; })) siteState.compare = changes.length ? changes[0].p.id : null;
+    shell('staging',
+      head('Staging', 'Edits wait here, in a private copy, until someone publishes them. The public site keeps showing the live posts. Pick the changes to publish together, or ask a teammate to review one first.') +
       '<section class="card" aria-labelledby="ch-h"><div class="row"><h2 id="ch-h" class="grow">Staged changes</h2>' +
-        (changes.length ? '<button type="button" class="btn btn-primary btn-sm" data-act="publish-selected">' + icon('send') + 'Publish selected</button>' : '') + '</div>' +
+        (changes.length ? '<span class="sub muted" id="pick-count" aria-live="polite"></span><button type="button" class="btn btn-primary btn-sm" data-act="publish-selected">' + icon('send') + 'Publish selected</button>' : '') + '</div>' +
         (changes.length ? '<ul class="changes">' + changes.map(function (c) {
-          return '<li><input type="checkbox" class="stage-pick" id="sp-' + esc(c.p.id) + '" value="' + esc(c.p.id) + '"' + (c.kind !== 'New' ? ' checked' : '') + '><label for="sp-' + esc(c.p.id) + '" class="grow"><strong>' + esc(c.p.draft.title) + '</strong><span class="sub muted"> &nbsp;' + esc(c.note) + '</span></label>' + chip(c.kind === 'Edited' ? 'changed' : (c.kind === 'Scheduled' ? 'scheduled' : 'draft'), c.kind) + '<a class="btn btn-ghost btn-sm" href="#/posts/' + esc(c.p.id) + '">Edit</a></li>';
-        }).join('') + '</ul>' : '<p class="muted">Nothing staged. The live site and staging are the same.</p>') +
+          var r = c.r, id = esc(c.p.id), pub = canPublishReview(r);
+          var acts = '<button type="button" class="btn btn-ghost btn-sm" data-act="st-compare" data-id="' + id + '"' + (siteState.compare === c.p.id ? ' aria-pressed="true"' : ' aria-pressed="false"') + '>Compare</button>' +
+            '<a class="btn btn-ghost btn-sm" href="#/posts/' + id + '">Edit</a>' +
+            (r.status === 'staged' ? '<button type="button" class="btn btn-outline btn-sm" data-act="st-request" data-id="' + id + '">Request review</button>' : '') +
+            (r.status === 'in_review' ? '<button type="button" class="btn btn-outline btn-sm" data-act="st-approve" data-id="' + id + '"' + (canApprove(r) ? '' : ' disabled title="You staged this change. A teammate approves it."') + '>' + icon('check') + 'Approve</button>' : '') +
+            (r.status === 'in_review' && !canApprove(r) && teammate() ? '<button type="button" class="btn btn-ghost btn-sm" data-act="st-approve-demo" data-id="' + id + '" title="Demo only: in the kit, your teammate signs in and approves">Demo: approve as ' + esc(teammate().name) + '</button>' : '') +
+            (r.status !== 'staged' ? '<button type="button" class="btn btn-ghost btn-sm" data-act="st-withdraw" data-id="' + id + '">' + (r.status === 'approved' ? 'Take back approval' : 'Withdraw request') + '</button>' : '') +
+            '<button type="button" class="btn btn-ghost btn-sm danger-text" data-act="st-discard" data-id="' + id + '">Discard</button>';
+          return '<li class="change"><div class="change-main"><input type="checkbox" class="stage-pick" id="sp-' + id + '" value="' + id + '"' + (pub ? '' : ' disabled') + '><label for="sp-' + id + '" class="grow"><strong>' + esc(c.p.draft.title) + '</strong> ' + chip(c.kind === 'Edited' ? 'changed' : 'draft', c.kind) + ' ' + reviewChip(r) +
+            '<span class="sub muted change-note">' + esc(c.note) + '. ' + esc(reviewLine(r)) + (pub ? '' : ' Needs an approval before it can be published.') + '</span></label></div>' +
+            '<div class="row change-acts">' + acts + '</div></li>';
+        }).join('') + '</ul>' : '<p class="muted">Nothing staged. The live site and staging are the same. Edit a live post, or choose "Stage for publishing" on a draft, and it waits here.</p>') +
       '</section>' +
+      (siteState.compare ? compareHtml(findPost(siteState.compare)) : '') +
       '<div class="stage-bar"><span class="grow"><strong>Viewing:</strong> <span id="mode-label"></span></span>' +
         '<div class="seg" role="group" aria-label="Which version of the site"><button type="button" data-mode="live" aria-pressed="false">Live site</button><button type="button" data-mode="staging" aria-pressed="false">Staging</button></div></div>' +
       '<div class="site-frame"><div class="site-chrome"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="url" id="site-url"></span></div><div class="site" id="site"></div></div>'
     );
     function visible() {
+      // Staging: the live posts with their staged copies laid over them, plus
+      // staged drafts; the same set getPreviewPosts() returns in the kit.
       return db.posts.filter(function (p) {
         if (siteState.mode === 'live') return !!p.live;
-        var s = postState(p); return s !== 'draft' || p.draft.title.trim();
+        return !!p.live || !!reviewOf(p);
       }).map(function (p) { return { p: p, c: siteState.mode === 'live' ? p.live : p.draft, s: postState(p) }; })
         .sort(function (a, b) { return (b.p.publishedAt || b.p.publishAt || b.p.updatedAt).localeCompare(a.p.publishedAt || a.p.publishAt || a.p.updatedAt); });
     }
     function flag(item) {
       if (siteState.mode === 'live') return '';
       if (item.s === 'changed') return '<span class="stage-flag">' + chip('changed', 'Edited') + '</span>';
-      if (item.s === 'scheduled') return '<span class="stage-flag">' + chip('scheduled', 'Scheduled') + '</span>';
       if (item.s === 'draft') return '<span class="stage-flag">' + chip('draft', 'New') + '</span>';
       return '';
     }
@@ -1058,18 +1172,50 @@
       var pg = e.target.closest('[data-page]'); if (pg) { siteState.page = pg.getAttribute('data-page'); draw(); return; }
       var po = e.target.closest('[data-post]'); if (po) { siteState.page = 'post'; siteState.postId = po.getAttribute('data-post'); draw(); $('#site').scrollIntoView({ block: 'start' }); }
     });
+    function pickCount() {
+      var el = $('#pick-count'); if (!el) return;
+      el.textContent = plural($all('.stage-pick:checked').length, 'change', 'changes') + ' picked';
+    }
+    $all('.stage-pick').forEach(function (c) { c.addEventListener('change', pickCount); });
+    pickCount();
     var pubBtn = $('[data-act="publish-selected"]');
     if (pubBtn) pubBtn.addEventListener('click', function () {
       var ids = $all('.stage-pick:checked').map(function (c) { return c.value; });
-      if (!ids.length) { toast('Tick at least one change to publish.', 'err'); return; }
+      // The same checks as checkPublishSelection() and publish_staged_posts():
+      // a pick that is empty, waiting in review or has a broken slug publishes nothing.
+      if (!ids.length) { toast('Pick at least one staged change to publish.', 'err'); return; }
+      var waiting = ids.map(findPost).filter(function (p) { return !canPublishReview(reviewOf(p)); })[0];
+      if (waiting) { toast('"' + waiting.draft.title + '" needs an approval before it can be published. Nothing was published.', 'err'); return; }
       var bad = ids.map(findPost).filter(function (p) { return publishProblems(p).length; });
-      if (bad.length) { toast('Fix before publishing: ' + bad.map(function (p) { return p.draft.title; }).join(', '), 'err'); return; }
-      confirmDialog({ title: 'Publish ' + plural(ids.length, 'change', 'changes') + '?', desc: 'The live site will match staging for the selected items.', confirm: 'Publish', onConfirm: function () {
-        ids.forEach(function (id) { var p = findPost(id); publishPost(p, postState(p) === 'changed' ? 'blog_post.publish_changes' : 'blog_post.publish'); });
+      if (bad.length) { toast('Fix before publishing: ' + bad.map(function (p) { return p.draft.title; }).join(', ') + '. Nothing was published.', 'err'); return; }
+      confirmDialog({ title: 'Publish ' + plural(ids.length, 'change', 'changes') + '?', desc: 'They replace the live versions on the public site. All of them go live together, or none do.', confirm: 'Publish', onConfirm: function () {
+        ids.forEach(function (id) { publishPost(findPost(id), null, ids.length); });
         save(); toast('Published ' + plural(ids.length, 'change', 'changes') + '.'); siteState.mode = 'live'; render(true);
       } });
     });
+    $('.main').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act^="st-"]'); if (!b) return;
+      var p = findPost(b.getAttribute('data-id')); if (!p) return;
+      var act = b.getAttribute('data-act');
+      if (act === 'st-compare') { siteState.compare = p.id; render(true); var cmp = $('#compare'); if (cmp) cmp.scrollIntoView({ block: 'start' }); return; }
+      if (act === 'st-request') { setReview(p, 'in_review'); save(); toast('Review requested. A teammate approves it before it can be published.'); render(true); }
+      else if (act === 'st-approve') { if (!canApprove(reviewOf(p))) { toast('You cannot approve a change you staged. Ask a teammate to approve it.', 'err'); return; } setReview(p, 'approved'); save(); toast('Approved. Anyone can publish it now.'); render(true); }
+      else if (act === 'st-approve-demo') { var tm = teammate(); if (!tm) return; setReview(p, 'approved', tm.name); save(); toast('Approved by ' + tm.name + ' (demo). Anyone can publish it now.'); render(true); }
+      else if (act === 'st-withdraw') { setReview(p, 'staged'); save(); toast('Moved back to staged.'); render(true); }
+      else if (act === 'st-discard') {
+        confirmDialog({ title: 'Discard this staged change?', desc: 'The staged copy of <strong>' + esc(p.draft.title) + '</strong> is deleted. ' + (p.live ? 'The live post stays exactly as it is.' : 'The draft stays a draft.'), confirm: 'Discard', danger: true, onConfirm: function () { discardStage(p); save(); toast('Staged change discarded.'); render(true); } });
+      }
+    });
     draw();
+  }
+  // Live and staged side by side for one staged change.
+  function compareHtml(p) {
+    if (!p) return '';
+    return '<section class="card compare" id="compare" aria-labelledby="cmp-h"><h2 id="cmp-h">Live and staged, side by side</h2>' +
+      '<div class="compare-grid">' +
+        '<div class="compare-col"><p class="compare-label">Live now</p>' + (p.live ? articleHtml(p.live, p) : '<p class="muted">Not on the site yet. Publishing makes this a new post.</p>') + '</div>' +
+        '<div class="compare-col staged"><p class="compare-label">Staged</p>' + articleHtml(p.draft, p) + '</div>' +
+      '</div></section>';
   }
 
   // -------------------------------------------------------------- media
@@ -1441,7 +1587,7 @@
     if (s && s.signedIn) shell('', inner); else authPage(inner);
   }
 
-  var ROUTES = { login: viewLogin, security: viewSecurity, forgot: viewForgot, posts: viewPostEditorOrList, preview: viewPreview, site: viewSite, media: viewMedia, team: viewTeam, audit: viewAudit, redirects: viewRedirects, settings: viewSettings };
+  var ROUTES = { login: viewLogin, security: viewSecurity, forgot: viewForgot, posts: viewPostEditorOrList, preview: viewPreview, staging: viewSite, site: viewSite, media: viewMedia, team: viewTeam, audit: viewAudit, redirects: viewRedirects, settings: viewSettings };
   function viewPostEditorOrList(rest) { return rest.length ? viewPostEditor(rest) : viewPosts(); }
 
   // ------------------------------------------------- global interactions

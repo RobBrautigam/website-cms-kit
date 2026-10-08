@@ -63,12 +63,14 @@ source/
         page.tsx                redirect -> /admin/posts
         error.tsx loading.tsx   route-group error boundary + skeleton
         posts/ jobs/ testimonials/ redirects/   resource CRUD (index + new + edit + actions.ts)
+        staging/                staged post changes: review, approve, compare, publish selected
         team/                   super-admin user management
         audit-log/              filterable log + CSV export
         settings/               2FA + change password
         sitemap/ help/          utility pages
     api/
       admin/auth/ admin/mfa/ admin/users/        admin-only JSON endpoints
+      admin/preview/            turn the whole-site preview (Next.js draft mode) on and off
       ai/                       optional Claude content generation
       upload/ revalidate/ redirects/hit/         image upload, ISR hook, redirect telemetry
   lib/
@@ -76,6 +78,7 @@ source/
     auth/                       require gates, role types, MFA, audit writer, team queries, password rules
     admin/                      ActionResult discriminated union
     redirects/                  redirect lookup + matching + validation (backs the proxy + resource)
+    staging/                    staging rules, staged-change queries, preview reads (draft mode only)
     a11y/                       focus trap, scroll lock, media query, reduced motion
   components/
     admin/                      AdminShell, nav, primitives, MFA UI, resource UI
@@ -83,6 +86,8 @@ source/
     redirects/RedirectBeacon.tsx  optional internal-redirect hit telemetry
   app/globals.css               neutral design tokens + component classes (re-theme here)
   supabase/migrations/000_admin_cms_schema.sql   the whole schema + RLS
+  supabase/migrations/001_staging_and_approval.sql   staged post changes + RLS + review trigger
+  supabase/tests/               database tests on an in-memory Postgres (npm test)
 ```
 
 ## Key conventions

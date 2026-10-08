@@ -2,6 +2,26 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.2.0 (2026-10-08)
+
+### Added
+
+- **Staging and approval for posts** ([docs/10](docs/10-staging-and-approval.md)). Saving a published post no longer changes the live site: the edit is stored as a staged copy in a new private table, `blog_post_staged_changes` (one per post), and the public site keeps reading the live row until someone publishes. A never-published draft can be staged too.
+- **Review states** `staged`, `in_review` and `approved`, enforced by a database trigger whatever client writes the row: a new stage always starts as `staged`, editing the content resets any review, an approval needs a different admin from the one who staged the content, and the bookkeeping columns cannot be written directly. Review is optional by default; `public.staging_review_required()` and `REVIEW_REQUIRED` make it mandatory.
+- **`public.publish_staged_posts(uuid[])`**, which publishes a selection in one transaction (all or none) with the caller's own rights, keeps a post's first publish date, and refuses a change still waiting for an approval.
+- **Migration `001_staging_and_approval.sql`**: the table, its RLS (admins only, the two-factor rule from 1.1.0 applied as a restrictive policy, no grant and no policy for the public key), the trigger and the publish function. Safe to run twice.
+- **Admin screens**: a Staged badge on the posts list; "Stage changes" and "Publish now" on a live post in the editor, "Stage for publishing" on a draft, and the editor opening on the staged copy; a new **Staging** page listing every staged change with request review, approve, withdraw, discard, a live and staged comparison, and publish selected.
+- **Whole-site preview through Next.js draft mode**: `POST /api/admin/preview` (same-origin form, `requireAdmin()`, on-site paths only) and `POST /api/admin/preview/exit`, plus `getPreviewPost()` and `getPreviewPosts()` for your public pages, which re-check the admin and read with the visitor's own session.
+- **Audit log actions** for every staging step: `blog_post.stage`, `request_review`, `approve`, `withdraw_review`, `discard_staged`, `publish_staged` (with a batch id when several publish together) and `staging.preview_enabled`.
+- **Database tests** in `source/supabase/tests/`: PGlite (Postgres in WebAssembly) loads both migrations with a small stand-in for Supabase's `auth` and `storage` schemas, and `node --test` checks every staging rule as each kind of caller. The staging rules the screens use (`lib/staging/rules.ts`) have their own tests. Every test was seen failing before the code it guards existed, and each rule was then broken on purpose to confirm a test catches it.
+- **Demo**: the Staging page, request review, approve (with a "Demo: approve as" helper, since the demo has one signed-in person), compare and publish selected are now the real behavior, with no Proposed label. Media, invite resend or cancel and the redirect tester stay labeled Proposed.
+
+### Changed
+
+- `lib/data.ts` exports `mapPost` so the preview reads map rows the same way the public pages do. The public data layer still never reads staged rows.
+- The post status select is locked on a live post (publish or unpublish from the buttons instead), so a status change cannot slip past staging.
+- README: a staging section with a diagram, a tests section, and new screenshots; the demo's landing page and walkthrough follow the staging flow.
+
 ## 1.1.0 (2026-10-08)
 
 ### Added

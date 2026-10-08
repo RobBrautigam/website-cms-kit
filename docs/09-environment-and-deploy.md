@@ -18,7 +18,7 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 
 ## Supabase setup (once per project)
 
-1. Run `source/supabase/migrations/000_admin_cms_schema.sql` in the SQL editor.
+1. Run `source/supabase/migrations/000_admin_cms_schema.sql` in the SQL editor, then `001_staging_and_approval.sql` (staging and approval, [docs/10](10-staging-and-approval.md)).
 2. Check the `blog-images` Storage bucket the migration created: public, 5 MB limit, MIME allow-list `image/jpeg, image/png, image/webp, image/gif`, and the four `blog_images_admin_*` policies on `storage.objects`.
 3. Auth -> URL Configuration -> Redirect URLs: add `/admin/reset-password` and `/admin/reset-password?context=invite` for prod + localhost.
 4. Auth -> Providers -> Email: configure production SMTP; the default sender is rate-limited.

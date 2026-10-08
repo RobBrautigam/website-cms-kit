@@ -10,7 +10,7 @@ A useful report says which file and pattern is affected, what an attacker could 
 
 In scope:
 
-- The patterns in `source/`: the proxy, the server gates, the API routes, the SQL migration and its RLS policies, the Storage policies, the MFA and recovery-code flow, the audit log.
+- The patterns in `source/`: the proxy, the server gates, the API routes, the SQL migrations and their RLS policies, the Storage policies, the MFA and recovery-code flow, the audit log, staging and approval (anything that lets the public site or a non-admin read a staged change, or publishes a change in review), and the draft-mode preview switch.
 - The guidance in `docs/`, where following it as written would leave a project exposed.
 - The interactive demo in `demo/`, for anything that lets the page run script it should not, or send data anywhere.
 
@@ -34,6 +34,7 @@ Around those layers:
 - **Audit log.** Sign-ins, content changes and every permission change write an append-only row with who, what, when and the client IP as reported by the request's headers. Only the header your host or edge sets is trustworthy (`cf-connecting-ip` behind Cloudflare); behind anything else, a client can send that header itself.
 - **Uploads.** Only active admins can write to the image bucket (Storage RLS). The bucket enforces a 5 MB limit server-side and accepts only uploads declared as JPEG, PNG, WebP or GIF; SVG is excluded on purpose. The type is the one the client declares, not a check of the file's bytes. File names are random, and the extension comes from the checked type, never the uploaded name.
 - **Secrets.** The service-role (or secret) key is used only in server modules; `server.ts` imports `server-only` so a client import fails the build.
+- **Staging.** Staged edits live in a private table with no grant and no policy for the public key, and the public data layer never reads it. The whole-site preview turns on Next.js draft mode only from a same-origin form posted by an admin, and its reads re-check the admin and use the visitor's own session, so a copied preview cookie shows the live site. A change in review needs a different admin to approve it; the database enforces that.
 
 ## Known limitations
 

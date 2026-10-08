@@ -10,13 +10,13 @@ Sign in with the pre-filled form (any password works); the two-factor code is `1
 
 ## In the kit today, and what is proposed
 
-Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar or on the page (a "Partly proposed" note where a page mixes the two).
+Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar or on the page (a "Partly proposed" note where a page mixes the two). Staging and approval moved from proposed to real in 1.2.0.
 
 | | |
 |---|---|
-| **In the kit's source today** | Invite-only sign-in, two-factor and recovery codes, posts with draft, scheduled and published states, a per-post preview, local autosave, the TipTap editor, image upload from the post form, team management, the audit log with CSV export, redirects. (The kit also has jobs, testimonials, a sitemap view and a help page, which the demo leaves out.) |
-| **Proposed, previewed in the demo** | Staged edits on a live post and the "Changes pending" state (the kit today updates a live post on save), the whole-site staging preview with publish-selected, the media library page, resending or cancelling an invite, and the redirect tester with its loop, chain, duplicate and reserved-path checks. |
-| **Demo-only helpers** | The light and dark theme switch (the kit documents how to add one), viewing the admin as another role, reset demo data. |
+| **In the kit's source today** | Invite-only sign-in, two-factor and recovery codes, posts with draft, scheduled and published states, a per-post preview, local autosave, the TipTap editor, image upload from the post form, staged edits on live posts with request review, approve and discard, the Staging page with compare, a whole-site preview and publish-selected, team management, the audit log with CSV export, redirects. (The kit also has jobs, testimonials, a sitemap view and a help page, which the demo leaves out.) |
+| **Proposed, previewed in the demo** | The media library page, resending or cancelling an invite, and the redirect tester with its loop, chain, duplicate and reserved-path checks. |
+| **Demo-only helpers** | The light and dark theme switch (the kit documents how to add one), viewing the admin as another role, "Demo: approve as" a teammate (in the kit the teammate signs in and approves), reset demo data. |
 
 ## What works
 
@@ -24,9 +24,9 @@ Most of the demo mirrors code in the kit's source today. A few screens preview f
 |---|---|
 | Sign-in | Demo login, show or hide password, remember me, forgot password, two-factor step, recovery codes (using one turns two-factor off and forces setup again, as in the kit). |
 | Posts | Status counts, search, status and category filters, sort, edit, preview, duplicate, publish, unpublish, delete. |
-| Editor | TipTap rich-text editor with the kit's toolbar (headings, bold, italic, lists, quote, links with a scheme allowlist, images), autosave, URL slug check, word count, schedule, publish, discard staged changes. |
-| States | Draft, scheduled, published, and published with staged changes. A live post keeps showing its last published version until you publish the edits. |
-| Site preview | The whole site with every staged change, a live and staging toggle, and publish-selected. |
+| Editor | TipTap rich-text editor with the kit's toolbar (headings, bold, italic, lists, quote, links with a scheme allowlist, images), autosave, URL slug check, word count, schedule, Publish now, Stage for publishing on a draft, Request review, Approve, Withdraw request, discard staged changes. |
+| States | Draft, scheduled, published, and published with staged changes. A live post keeps showing its last published version until you publish the edits. A staged change is Staged, In review or Approved; a change in review cannot be published, and nobody approves their own change. |
+| Staging | Every staged change with its review state, Compare (live and staged side by side), Request review, Approve, Withdraw, Discard, a live and staging toggle for the whole site, and publish-selected. |
 | Media | Upload (JPEG, PNG, WebP or GIF up to 5 MB, resized in the browser), alt text, delete, pick as a featured or inline image. |
 | Team | Invite, change role, turn access off and on, reset link, the last-super-admin guard; resend or cancel an invite (proposed). |
 | Audit log | Every action above, filter by type and person, search, 50 rows a page, CSV export (with spreadsheet formula injection neutralized). |
@@ -47,10 +47,11 @@ It works at phone and desktop widths, in light and dark themes, with the keyboar
 | | |
 |---|---|
 | ![Posts list](screenshots/posts-light-desktop.png) | ![Editor](screenshots/editor-light-desktop.png) |
-| ![Site preview with staged changes](screenshots/site-preview-light-desktop.png) | ![Audit log](screenshots/audit-log-light-desktop.png) |
+| ![Staging page with staged changes](screenshots/staging-light-desktop.png) | ![Live and staged side by side](screenshots/staging-compare-light-desktop.png) |
+| ![Staging in the dark theme](screenshots/staging-dark-desktop.png) | ![Audit log](screenshots/audit-log-light-desktop.png) |
 | ![Posts in the dark theme](screenshots/posts-dark-desktop.png) | ![Sign-in](screenshots/login-light-desktop.png) |
 
-Phone: ![Posts on a phone, dark theme](screenshots/posts-dark-mobile.png) ![Editor on a phone](screenshots/editor-light-mobile.png)
+Phone: ![Posts on a phone, dark theme](screenshots/posts-dark-mobile.png) ![Staging on a phone, dark theme](screenshots/staging-dark-mobile.png) ![Editor on a phone](screenshots/editor-light-mobile.png)
 
 ## Run it locally
 
