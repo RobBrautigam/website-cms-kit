@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/require'
 import { isLastActiveSuperAdmin } from '@/lib/auth/team-queries'
 import { recordAdminAction } from '@/lib/auth/audit'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 // 100 years in hours — Supabase's ban_duration accepts a Go-style duration
 // string. Effectively permanent for any human admin lifetime, and trivially
@@ -19,9 +20,11 @@ const BAN_DURATION = '876000h'
  * Refuses to deactivate the only active super_admin.
  */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireSuperAdmin()
 
   const { id: targetUserId } = await params

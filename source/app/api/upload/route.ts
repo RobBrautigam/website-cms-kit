@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth/require'
 import { IMAGE_TYPES, MAX_IMAGE_BYTES, newImagePath } from '@/lib/admin/upload-image'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 // An optional server-side upload path: nothing in the kit calls it (the
 // editor uploads from the browser through lib/admin/upload-image.ts). It
@@ -9,6 +10,8 @@ import { IMAGE_TYPES, MAX_IMAGE_BYTES, newImagePath } from '@/lib/admin/upload-i
 // size cap and file naming, so the two paths can never disagree.
 
 export async function POST(request: NextRequest) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   // Admin-only. Every other mutating route gates with requireAdmin; the proxy
   // does not cover /api/*, so gate here (not just "is logged in").
   await requireAdmin()

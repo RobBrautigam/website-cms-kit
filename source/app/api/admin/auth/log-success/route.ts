@@ -1,5 +1,6 @@
 import { requirePartialAdmin } from "@/lib/auth/require";
 import { recordAdminAction } from "@/lib/auth/audit";
+import { crossSiteRefusal } from "@/lib/security/request-origin";
 
 /**
  * Authenticated audit endpoint for successful admin logins. Called
@@ -15,7 +16,9 @@ import { recordAdminAction } from "@/lib/auth/audit";
  * pollute the audit log. See the deleted /api/admin/auth/log-attempt route
  * for the prior design.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const refused = crossSiteRefusal(request);
+  if (refused) return refused;
   // requirePartialAdmin (not requireAdmin) is intentional: at the moment
   // this endpoint is called, the session is aal1 and the user may not yet
   // have a verified factor. The MFA gate runs AFTER login routing.

@@ -7,9 +7,7 @@ import assert from 'node:assert/strict'
 import {
   availableActions,
   checkPublishSelection,
-  isSameOriginPost,
   pickStagedContent,
-  publicOrigin,
   publishNowRefusal,
   reviewLabel,
   safePreviewPath,
@@ -97,31 +95,6 @@ test('the preview refuses anything that could leave the site', () => {
   for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)', 'blog', '/blog\nSet-Cookie: x', '/a\\b', `/${'a'.repeat(600)}`, 42]) {
     assert.equal(safePreviewPath(bad), null, String(bad))
   }
-})
-
-test('the preview switch only accepts a form posted from this site', () => {
-  const url = 'https://site.example/api/admin/preview'
-  assert.equal(isSameOriginPost('https://site.example', null, url), true)
-  assert.equal(isSameOriginPost(null, 'same-origin', url), true)
-  assert.equal(isSameOriginPost('https://evil.example', null, url), false)
-  assert.equal(isSameOriginPost('https://site.example.evil.example', null, url), false)
-  assert.equal(isSameOriginPost('null', null, url), false)
-  // An opaque origin falls back to the browser-set Sec-Fetch-Site header.
-  assert.equal(isSameOriginPost('null', 'same-origin', url), true)
-  assert.equal(isSameOriginPost(null, 'cross-site', url), false)
-  assert.equal(isSameOriginPost(null, null, url), false)
-})
-
-test('behind a proxy, the site origin comes from the forwarded host, not the server bind address', () => {
-  const internal = 'http://localhost:3000/api/admin/preview'
-  assert.equal(publicOrigin('cms.example.com', 'https', 'localhost:3000', internal), 'https://cms.example.com')
-  assert.equal(publicOrigin('cms.example.com, proxy.internal', 'https, http', null, internal), 'https://cms.example.com')
-  assert.equal(publicOrigin('cms.example.com', null, null, internal), 'https://cms.example.com')
-  assert.equal(publicOrigin(null, null, 'cms.example.com', internal), 'http://cms.example.com')
-  assert.equal(publicOrigin(null, null, null, 'https://site.example/api/admin/preview'), 'https://site.example')
-  // The browser's own Origin then matches on a proxied deploy.
-  assert.equal(isSameOriginPost('https://cms.example.com', null, publicOrigin('cms.example.com', 'https', 'localhost:3000', internal)), true)
-  assert.equal(isSameOriginPost('https://evil.example', null, publicOrigin('cms.example.com', 'https', 'localhost:3000', internal)), false)
 })
 
 test('"Publish now" refuses a change that is waiting for review, and allows the rest', () => {

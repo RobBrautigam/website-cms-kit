@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/require'
 import { recordAdminAction } from '@/lib/auth/audit'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 /**
  * POST /api/admin/users/[id]/reactivate
@@ -10,9 +11,11 @@ import { recordAdminAction } from '@/lib/auth/audit'
  * and clears user_roles.deactivated_at.
  */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireSuperAdmin()
 
   const { id: targetUserId } = await params

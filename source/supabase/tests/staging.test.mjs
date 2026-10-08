@@ -17,6 +17,9 @@ const MIGRATIONS = [
   here('./supabase-stub.sql'),
   here('../migrations/000_admin_cms_schema.sql'),
   process.env.STAGING_MIGRATION || here('../migrations/001_staging_and_approval.sql'),
+  // 002 replaces publish_staged_posts() and adds the two-person lock, so the
+  // staging rules are checked with it in place. SKIP_002=1 leaves it out.
+  ...(process.env.SKIP_002 ? [] : [here('../migrations/002_hardening.sql')]),
 ]
 
 // Fixed ids keep the failures readable.

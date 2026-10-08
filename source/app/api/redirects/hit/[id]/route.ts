@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { recordHit } from "@/lib/redirects/lookup";
 import { isBot } from "@/lib/redirects/bot-detect";
+import { clientAddress } from "@/lib/security/rate-limit";
 
 /**
  * Beacon endpoint for internal-redirect hit telemetry.
@@ -12,7 +13,8 @@ import { isBot } from "@/lib/redirects/bot-detect";
  * id maps to a real redirect, and the client-side beacon ignores the
  * response either way.
  *
- * The handler runs `recordHit()` server-side. recordHit is fire-and-forget
+ * The handler runs `recordHit()` server-side, keyed by the visitor's address
+ * so the database can cap how often one visitor counts. recordHit is fire-and-forget
  * but we await it so a transient Supabase error doesn't kill the request
  * silently in dev.
  */
@@ -42,7 +44,7 @@ export async function POST(
   }
 
   try {
-    await recordHit(id);
+    await recordHit(id, clientAddress(request.headers));
   } catch {
     // Silently swallow — telemetry is best-effort. The cookie is already
     // gone by the time the beacon fires, so retry isn't possible anyway.

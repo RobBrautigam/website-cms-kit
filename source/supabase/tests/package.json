@@ -4,10 +4,11 @@
   "description": "Database tests for the kit's migrations, on an in-memory Postgres (PGlite). No Supabase project needed.",
   "type": "module",
   "scripts": {
-    "test": "node --test *.test.mjs ../../lib/staging/*.test.mjs"
+    "test": "node --import ./register.mjs --test *.test.mjs \"../../lib/**/*.test.mjs\""
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.8"
+    "@electric-sql/pglite": "0.5.8",
+    "zod": "4.6.5"
   },
   "engines": {
     "node": ">=22.18"

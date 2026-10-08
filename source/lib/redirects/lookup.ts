@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { compilePattern, matchAndSubstitute } from "./patterns";
 import type { UrlRedirect, PatternRedirect, RedirectMatch } from "./types";
+import { RATE_LIMITS } from "../security/rate-limit";
 
 const TTL_MS = 30_000;
 
@@ -91,37 +92,37 @@ export async function lookupRedirect(pathname: string): Promise<RedirectMatch | 
 }
 
 /**
- * Hit counter increment via raw fetch to the Supabase RPC endpoint.
+ * Count one hit on a redirect, through `record_redirect_hit()` (migration
+ * 002, section 15) on the service role. The function counts each visitor at
+ * most RATE_LIMITS.redirectHit.perCaller times per window per redirect, and
+ * each redirect at most perRedirect times per window in total, so a script
+ * cannot inflate a counter by replaying the beacon or rotating addresses.
+ * The public key can no longer bump the counter at all.
  *
- * NOT CURRENTLY CALLED FROM THE PROXY — see the Phase 1.5 follow-up. Two Next 16
- * constraints prevent the obvious wiring:
- *
- *   1. Pending I/O initiated AFTER a NextResponse.redirect() construction is
- *      short-circuited (verified in both Turbopack dev and `next start`).
- *      Even `await` before the return is not honored when the function will
- *      return a redirect.
- *   2. Module-level state in the proxy is NOT shared with route handlers
- *      (verified — they run in isolated module instances), so a "queue in
- *      proxy / flush in route handler" pattern cannot bridge them.
- *
- * The function is exported and ready for a follow-up phase, which will use one of:
- *   - Client-side beacon fetch from internal destination pages.
- *   - A separate edge-side solution for external destinations.
- *   - A waitUntil binding once Next.js exposes one for proxy middleware.
+ * Called from the proxy's `after()` for external redirects and from the
+ * beacon route (/api/redirects/hit/[id]) for internal ones. Best-effort: a
+ * missing service key or a failed call just skips the count.
  */
-export async function recordHit(redirectId: string): Promise<void> {
+export async function recordHit(redirectId: string, callerKey: string): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return;
+  const { perCaller, perRedirect, windowSeconds } = RATE_LIMITS.redirectHit;
   try {
-    await fetch(`${url}/rest/v1/rpc/increment_redirect_hit`, {
+    await fetch(`${url}/rest/v1/rpc/record_redirect_hit`, {
       method: "POST",
       headers: {
         apikey: key,
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ redirect_id: redirectId }),
+      body: JSON.stringify({
+        redirect_id: redirectId,
+        caller_key: callerKey,
+        per_caller_max: perCaller,
+        per_redirect_max: perRedirect,
+        window_seconds: windowSeconds,
+      }),
     });
   } catch {
     // Swallow - hit_count is best-effort.

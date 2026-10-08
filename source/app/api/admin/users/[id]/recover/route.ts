@@ -2,16 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/require'
 import { recordAdminAction } from '@/lib/auth/audit'
-
-function siteOrigin(request: NextRequest): string {
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const protoHeader = request.headers.get('x-forwarded-proto')
-  if (forwardedHost) {
-    const proto = protoHeader || 'https'
-    return `${proto}://${forwardedHost}`
-  }
-  return new URL(request.url).origin
-}
+import { crossSiteRefusal, siteOriginOf } from '@/lib/security/request-origin'
 
 /**
  * POST /api/admin/users/[id]/recover
@@ -24,6 +15,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireSuperAdmin()
 
   const { id: targetUserId } = await params
@@ -41,7 +34,7 @@ export async function POST(
     )
   }
 
-  const origin = siteOrigin(request)
+  const origin = siteOriginOf(request)
 
   // IMPORTANT: use resetPasswordForEmail (NOT auth.admin.generateLink).
   // generateLink only generates the link — it doesn't trigger the email send.
