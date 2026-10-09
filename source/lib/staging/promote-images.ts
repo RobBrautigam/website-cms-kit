@@ -27,7 +27,16 @@ export async function promoteImages(
   content: { featured_image_url?: unknown; body?: unknown },
   postId: string
 ): Promise<string | null> {
-  const paths = imagePathsIn(content)
+  return promoteImagePaths(imagePathsIn(content), postId)
+}
+
+/**
+ * The same promotion for a list of paths. Testimonials use it (1.5.0): their
+ * pictures upload into the same staged bucket and go public when the
+ * testimonial is saved, since testimonials save live. The ledger's post_id
+ * then holds the testimonial's id.
+ */
+export async function promoteImagePaths(paths: string[], postId: string): Promise<string | null> {
   if (paths.length === 0) return null
   const svc = createServiceClient()
   const storage = svc.storage

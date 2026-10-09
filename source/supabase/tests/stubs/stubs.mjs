@@ -24,7 +24,7 @@ export const fakes = {
   /** The model's text reply. */
   modelText: '[]',
   /** Two in-memory buckets for the storage stand-in. */
-  storage: { staged: new Set(), public: new Set(), failCopy: null },
+  storage: { staged: new Set(), public: new Set(), failCopy: null, refuseRemove: [] },
   /** consumeRateLimit answers per bucket (default true); an Error is thrown instead. */
   limits: {},
   /** In-memory tables for the query-builder stand-in: name -> rows. */
@@ -35,6 +35,10 @@ export const fakes = {
   rpc: {},
   /** The recovery-code row id findUnusedRecoveryCodeId returns (null: no match). */
   recoveryCode: null,
+  /** Per table: a function run once on the rows just before the next update (a concurrent write). */
+  beforeUpdate: {},
+  /** The request headers next/headers answers with: a plain object. */
+  headers: {},
 }
 
 export function resetStubs() {
@@ -51,10 +55,12 @@ export function resetStubs() {
   fakes.aiAllowed = true
   fakes.modelText = '[]'
   fakes.modelError = null
-  fakes.storage = { staged: new Set(), public: new Set(), failCopy: null }
+  fakes.storage = { staged: new Set(), public: new Set(), failCopy: null, refuseRemove: [] }
   fakes.limits = {}
   fakes.tables = {}
   fakes.failInsert = {}
   fakes.rpc = {}
   fakes.recoveryCode = null
+  fakes.beforeUpdate = {}
+  fakes.headers = {}
 }

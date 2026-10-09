@@ -4,13 +4,13 @@ import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import { createClient } from '@/lib/supabase/client'
-import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
 import { isSafeHref } from '@/lib/safe-href'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getWordCount } from '@/lib/utils'
 import { bodyImagesMissingAlt } from '@/lib/admin/alt-text'
 import { stagedImageFallback } from '@/lib/staging/images'
+import MediaPicker, { type PickedImage } from './MediaPicker'
+import { saveMediaAlt } from '@/app/(admin)/admin/media/actions'
 
 interface PostEditorProps {
   content: Record<string, unknown>
@@ -19,6 +19,7 @@ interface PostEditorProps {
 
 // Null until the editor mounts on the client (immediatelyRender: false).
 function EditorToolbar({ editor }: { editor: Editor | null }) {
+  const [picking, setPicking] = useState(false)
   if (!editor) return null
 
   const btnClass = (active: boolean) =>
@@ -26,29 +27,17 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       active ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:bg-bg-card'
     }`
 
-  async function addImage() {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = IMAGE_ACCEPT
-    input.onchange = async () => {
-      const file = input.files?.[0]
-      if (!file) return
-
-      try {
-        const result = await uploadBlogImage(createClient(), file)
-        if ('error' in result) {
-          alert(result.error)
-          return
-        }
-        // Alt text is required before the post goes live; ask for it now,
-        // while the writer knows what the image shows.
-        const alt = prompt('Describe this image for people who cannot see it (alt text):')?.trim() ?? ''
-        editor?.chain().focus().setImage({ src: result.url, alt }).run()
-      } catch {
-        alert('Upload failed. Please try again.')
-      }
-    }
-    input.click()
+  // From the media library (reused, no second upload) or a fresh upload.
+  function insertImage(image: PickedImage) {
+    setPicking(false)
+    // Alt text is required before the post goes live; ask for it now, while
+    // the writer knows what the image shows, offering the text kept for it.
+    const answer = prompt('Describe this image for people who cannot see it (alt text):', image.alt)
+    if (answer === null) return
+    const alt = answer.trim()
+    editor?.chain().focus().setImage({ src: image.url, alt }).run()
+    // The first description an image gets is kept for the next time it is picked.
+    if (alt && !image.alt && image.path) void saveMediaAlt(image.path, alt)
   }
 
   function editAlt() {
@@ -111,7 +100,7 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       <button type="button" onClick={addLink} className={btnClass(editor?.isActive('link') || false)}>
         Link
       </button>
-      <button type="button" onClick={addImage} className={btnClass(false)}>
+      <button type="button" onClick={() => setPicking(true)} className={btnClass(false)}>
         Image
       </button>
       {editor?.isActive('image') && (
@@ -119,6 +108,7 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
           Alt text
         </button>
       )}
+      {picking && <MediaPicker onPick={insertImage} onClose={() => setPicking(false)} />}
     </div>
   )
 }

@@ -16,6 +16,8 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 | `CSP_REPORT_URI` | optional | server-only | Where browsers send policy violation reports. |
 | `HSTS_PRELOAD` | optional | server-only | `1` adds `includeSubDomains; preload` to the HSTS header. Off by default: read [HSTS and the preload list](#hsts-and-the-preload-list) first. |
 | `TRUSTED_PROXY_HOPS` | optional | server-only | How many proxies in front of the app append to `X-Forwarded-For` (default `1`). The caller is read that many entries from the right, never the first entry, which the visitor writes. Set `2` behind a CDN in front of your host. |
+| `SCHEDULED_IMAGES` | optional | server-only | `at_publish` keeps a scheduled post's images private until its date; they go public through the scheduled-publishing route. Anything else (the default) makes them public when the post is scheduled ([docs/13](13-media-library.md#the-images-of-a-scheduled-post)). |
+| `CRON_SECRET` | with `SCHEDULED_IMAGES` | **server-only** | The bearer secret the scheduler sends to `POST /api/cron/scheduled-publishing`, at least 32 characters (`openssl rand -hex 32`). The route answers 503 without it. Keep the same value in Supabase Vault for the Cron job. |
 
 `.env.example` lists these with placeholders. Copy to `.env.local` for dev; set them in your host's dashboard for production. Never commit real values.
 

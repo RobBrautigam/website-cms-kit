@@ -34,6 +34,9 @@ export type AuditAction =
   | "blog_post.scheduled_unpublish"
   | "blog_post.images_promoted"
   | "staging.orphans_cleaned"
+  // The media library (docs/13-media-library.md)
+  | "media.alt_update"
+  | "media.delete"
   | "job.create"
   | "job.update"
   | "job.delete"

@@ -4,16 +4,27 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
 import AdminImage from './AdminImage'
+import MediaPicker, { type PickedImage } from './MediaPicker'
 
 interface ImageUploaderProps {
   currentUrl?: string
   onUpload: (url: string) => void
+  /** A pick from the media library, with the alt text kept for it (1.5.0). Falls back to onUpload. */
+  onPick?: (url: string, alt: string) => void
   label?: string
 }
 
-export default function ImageUploader({ currentUrl, onUpload, label = 'Featured Image' }: ImageUploaderProps) {
+export default function ImageUploader({ currentUrl, onUpload, onPick, label = 'Featured Image' }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false)
+  const [picking, setPicking] = useState(false)
   const [preview, setPreview] = useState(currentUrl || '')
+
+  function handlePick(image: PickedImage) {
+    setPicking(false)
+    setPreview(image.url)
+    if (onPick) onPick(image.url, image.alt)
+    else onUpload(image.url)
+  }
   const fileRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -70,6 +81,14 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
           {uploading ? 'Uploading...' : 'Click to upload image'}
         </button>
       )}
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="mt-2 text-sm font-medium text-accent hover:underline"
+      >
+        {preview ? 'Replace from the media library' : 'Or choose from the media library'}
+      </button>
+      {picking && <MediaPicker onPick={handlePick} onClose={() => setPicking(false)} />}
       <input
         ref={fileRef}
         type="file"

@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/require";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { sanitizeQuote } from "@/lib/supabase/testimonials";
+import { imagePathsInTestimonial } from "@/lib/staging/images";
+import { promoteImagePaths } from "@/lib/staging/promote-images";
 import {
   ok,
   err,
@@ -34,6 +36,20 @@ function parseFloatOrNull(value: FormDataEntryValue | null): number | null {
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * A testimonial saves live, so its pictures go public with it (1.5.0). Since
+ * 1.3.0 an upload lands in the private staged bucket, and before this they
+ * were never copied across. The same ledger as posts decides, so an object
+ * the kit did not promote is still refused. Returns null, or the message.
+ */
+async function publishTestimonialImages(
+  row: Parameters<typeof imagePathsInTestimonial>[0],
+  id: string
+): Promise<ActionResult | null> {
+  const failed = await promoteImagePaths(imagePathsInTestimonial(row), id);
+  return failed ? err(`Saved. ${failed}`, "server") : null;
 }
 
 function parseFormData(formData: FormData) {
@@ -91,7 +107,7 @@ export async function createTestimonial(
   });
   revalidatePath("/admin/testimonials");
   revalidatePath("/results");
-  return ok();
+  return (await publishTestimonialImages(payload, inserted.id as string)) ?? ok();
 }
 
 export async function updateTestimonial(
@@ -119,7 +135,7 @@ export async function updateTestimonial(
   });
   revalidatePath("/admin/testimonials");
   revalidatePath("/results");
-  return ok();
+  return (await publishTestimonialImages(payload, id)) ?? ok();
 }
 
 export async function deleteTestimonial(id: string): Promise<ActionResult> {

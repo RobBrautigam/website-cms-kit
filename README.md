@@ -8,7 +8,7 @@ It is the real backend of a production marketing site, extracted faithfully and 
 
 **▶ https://robbrautigam.github.io/website-cms-kit/demo/**
 
-A working version of the admin that runs entirely in your browser. Sign in with the pre-filled form (any password works), enter the two-factor code `123456`, then edit a live post without touching the live site, ask a teammate to review it, compare live and staged side by side, publish the changes you pick, invite a teammate and watch every step land in the audit log.
+A working version of the admin that runs entirely in your browser. Sign in with the pre-filled form (any password works), enter the two-factor code `123456`, then edit a live post without touching the live site, ask a teammate to review it, compare live and staged side by side, publish the changes you pick, reuse an image from the media library, invite a teammate and watch every step land in the audit log.
 
 **Sample data only.** Everything in the demo is invented, saved only in your browser's local storage, and never sent anywhere. A few screens preview proposed features that are not in the source yet; the demo marks them **Proposed**. Details in [`demo/README.md`](demo/README.md).
 
@@ -20,15 +20,18 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 | **Audit log** | **Dark theme** |
 | [![Audit log with filters and CSV export](demo/screenshots/audit-log-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/audit) | [![Staging page in the dark theme](demo/screenshots/staging-dark-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) |
 
+New in 1.5.0: [open the media library in the demo](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media) (each image's Private or Public state, the posts that use it, its alt text, and delete turned off for an image in use).
+
 ### A five-minute walkthrough
 
 1. **Sign in.** Press Sign in, then enter `123456`. The two-factor step also offers a recovery code; using one turns two-factor off and makes you set it up again, as the real kit does.
 2. **Edit a live post.** Open "Release notes: faster image uploads and alt text reminders", change a heading, add a link, insert an image (it asks for alt text). The live site keeps the published version; your edit is a staged change. The status line reads "Unsaved changes" until autosave lands, and the sidebar shows the post as a search result and a share card.
 3. **Ask for a review.** Press Request review. Nobody approves their own change, so the demo offers "Demo: approve as" a teammate. Another post, "How we review a post before it goes live", is waiting for your approval.
 4. **Preview and publish.** Open Staging, press Compare to see live and staged side by side, flip the whole site between Live site and Staging, then tick the changes you want and press Publish selected. A change still in review cannot be published.
-5. **Bulk and settings.** Tick a few posts on the Posts page and publish or unpublish them together: each one is applied or skipped with its reason. In Settings, making new recovery codes asks for your password first.
-6. **Team and audit.** Invite someone, change a role, try to demote the last super admin (refused), then find every step in the Audit log and export it.
-7. **Start over.** "Reset demo data" in the sidebar puts everything back.
+5. **Media.** Open Media: each image says whether it is still private or public, which posts use it, and its alt text. An image in use cannot be deleted. In the editor, Image opens the library: pick an image another post uses and its alt text is offered, with no second upload.
+6. **Bulk and settings.** Tick a few posts on the Posts page and publish or unpublish them together: each one is applied or skipped with its reason. In Settings, making new recovery codes asks for your password first.
+7. **Team and audit.** Invite someone, change a role, try to demote the last super admin (refused), then find every step in the Audit log and export it.
+8. **Start over.** "Reset demo data" in the sidebar puts everything back.
 
 ## What you get
 
@@ -39,10 +42,11 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 - **Audit log.** An append-only record of every sensitive change (a database trigger refuses edits and deletes), with a filterable viewer and CSV export.
 - **Hardened by default (1.3.0).** Security headers and a report-only Content Security Policy, one same-site check on every state-changing route, per-admin limits and output schemas on the AI routes, a server-only redirect counter, new recovery codes behind the password, private images until publish, and an opt-in database lock that puts post content and status under two-person control. See [docs/11](docs/11-hardening-and-everyday-comforts.md).
 - **Revisions and scheduled publishing (1.4.0).** Every save of a live or scheduled post keeps a revision (who, when, what changed) with a restore that goes through staging; scheduled posts go live on time and any post can come down at an end date, run by Supabase Cron in the database. The two-person lock now covers images and redirects too. See [docs/12](docs/12-revisions-and-scheduling.md).
+- **A media library (1.5.0).** One screen for every image in both buckets: private or public, the posts, staged changes, revisions and testimonials that use it, and its alt text, kept per image and offered when you pick it again in the editor, with no second upload. The database refuses to delete an image anything still uses. An optional server job keeps a scheduled post's images private until its date. See [docs/13](docs/13-media-library.md).
 - **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post.
 - **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
 - **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system you re-theme in one file, and Supabase Storage image upload guarded by Storage RLS.
-- **Three SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, staging and approval, then hardening. All three are tested on an in-memory Postgres, no Supabase project needed.
+- **Five SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, staging and approval, hardening, revisions and scheduling, then the media library. All five are tested on an in-memory Postgres, no Supabase project needed.
 
 ## How a request is checked
 
@@ -102,7 +106,7 @@ npm install
 npm test
 ```
 
-The tests load all four migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave and restoring a revision. 180 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
+The tests load all five migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, and the scheduled-images job. 216 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 
@@ -139,6 +143,7 @@ website-cms-kit/
 | [10-staging-and-approval.md](docs/10-staging-and-approval.md) | Staged copies of live posts, review and approval, the whole-site preview, publish-selected, and the tests. |
 | [11-hardening-and-everyday-comforts.md](docs/11-hardening-and-everyday-comforts.md) | 1.3.0: headers and CSP, the same-site check, rate limits, AI output schemas, the append-only audit trigger, the two-person lock, private staged images, and the editor and posts-list comforts. |
 | [12-revisions-and-scheduling.md](docs/12-revisions-and-scheduling.md) | 1.4.0: revisions and restore, scheduled publish and take-down, running the scheduler (Supabase Cron or the host's), and the lock on images and redirects. |
+| [13-media-library.md](docs/13-media-library.md) | 1.5.0: the media library, alt text per image, reuse, the rule that a used image is never deleted, the testimonial image fix, and the optional job for scheduled posts' images. |
 
 ## Tech stack
 
