@@ -14,6 +14,10 @@ import { createServiceClient } from '@/lib/supabase/server'
  */
 export type AiSpend = {
   settle(usage: { input_tokens?: number | null; output_tokens?: number | null } | null | undefined): Promise<void>
+  /** After a failed call: an API refusal (4xx) is not billed and is marked
+   *  'refused'; a timeout, a dropped connection or a 5xx may have been billed
+   *  and stays 'started'. */
+  failed(error: unknown): Promise<void>
 }
 
 export async function beginAiSpend(userId: string, route: string, model: string): Promise<AiSpend | Response> {
@@ -42,6 +46,15 @@ export async function beginAiSpend(userId: string, route: string, model: string)
         })
         .eq('id', id)
       if (settleError) console.error('ai_usage: settle failed', settleError.message)
+    },
+    async failed(error) {
+      const status = (error as { status?: unknown } | null)?.status
+      if (typeof status !== 'number' || status < 400 || status >= 500) return
+      const { error: refuseError } = await svc
+        .from('ai_usage')
+        .update({ status: 'refused', settled_at: new Date().toISOString() })
+        .eq('id', id)
+      if (refuseError) console.error('ai_usage: refuse failed', refuseError.message)
     },
   }
 }

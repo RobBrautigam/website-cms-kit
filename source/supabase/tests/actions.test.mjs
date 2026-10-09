@@ -258,3 +258,28 @@ test('restoring a revision stages its content, never writes the live post, and w
   assert.deepEqual(calls.audit, ['blog_post.restore_revision'])
   assert.equal((await restoreRevision('not-a-uuid')).ok, false)
 })
+
+// The review fixes (the session's one reviewer).
+
+test('a promoted image deleted from the public bucket is never replaced by a new staged upload at its path', async () => {
+  const { promoteImages } = await import('../../lib/staging/promote-images.ts')
+  fakes.storage.staged.add(A)
+  assert.equal(await promoteImages({ featured_image_url: IMG(A) }, POST_ID), null)
+  assert.equal(fakes.storage.public.has(A), true)
+  // One admin deletes the public file and uploads a different one at the same staged path.
+  fakes.storage.public.delete(A)
+  fakes.storage.staged.add(A)
+  await promoteImages({ featured_image_url: IMG(A) }, POST_ID)
+  assert.equal(fakes.storage.public.has(A), false)
+})
+
+test('AI: a call the API refused (4xx) is recorded as refused; a timeout stays as possibly billed', async () => {
+  const { POST } = await route('ai/suggest-title')
+  fakes.modelError = Object.assign(new Error('rate limited'), { status: 429 })
+  assert.equal((await POST(post('/api/ai/suggest-title', { excerpt: 'x' }))).status, 500)
+  assert.equal(fakes.tables.ai_usage[0].status, 'refused')
+  assert.ok(fakes.tables.ai_usage[0].settled_at)
+  fakes.modelError = new Error('socket hang up')
+  assert.equal((await POST(post('/api/ai/suggest-title', { excerpt: 'x' }))).status, 500)
+  assert.equal(fakes.tables.ai_usage[1].status, 'started')
+})

@@ -68,9 +68,11 @@ create policy "blog_images_staged_admin_delete"
 -- (source, pattern, destination, permanent) an admin changes, is saved
 -- switched off, with that admin recorded in changed_by; a different admin
 -- switches it on. Switching one off, editing its notes or category, and
--- deleting it stay free. changed_by is always kept by this trigger, so turning
--- the lock on later works on existing rows; a client cannot set it. The
--- service role (the hit counter) and the table owner are not affected.
+-- deleting it stay free. changed_by is always kept by this trigger; a client
+-- cannot set it. A row with no recorded changer (made before this migration,
+-- or its changer's account deleted) cannot be switched on by anyone until it
+-- is edited once, because its author cannot be told apart from a teammate.
+-- The service role (the hit counter) and the table owner are not affected.
 alter table public.url_redirects
   add column if not exists changed_by uuid references auth.users(id) on delete set null;
 
@@ -96,7 +98,12 @@ begin
 
   new.changed_by := old.changed_by;
   if public.staging_review_required() and new.enabled and not old.enabled
-     and old.changed_by is not distinct from auth.uid() then
+     and old.changed_by is null then
+    raise exception 'Review is required: nobody is recorded as changing this redirect, so edit its source or destination once, then ask a teammate to switch it on.'
+      using errcode = 'check_violation';
+  end if;
+  if public.staging_review_required() and new.enabled and not old.enabled
+     and old.changed_by = auth.uid() then
     raise exception 'Review is required: a teammate switches on a redirect you created or changed.'
       using errcode = 'check_violation';
   end if;
@@ -119,7 +126,8 @@ create trigger url_redirects_two_person_lock
 -- later puts nothing on the site sooner, so it needs no approval (like taking
 -- a post down). Pulling it earlier still does. Giving a post an end date
 -- (unpublish_at, section 21) changes neither content nor status, so it is
--- free too.
+-- free too, except clearing or moving an end date that has already passed:
+-- that puts the post back on the site, so it needs approval.
 create or replace function public.blog_posts_two_person_lock()
   returns trigger
   language plpgsql
@@ -162,6 +170,12 @@ begin
   -- Taking a post down, content as it is.
   if was_live and not is_live and not content_changed then
     return new;
+  end if;
+  -- Bringing back a post its end date has hidden.
+  if is_live and old.unpublish_at is not null and old.unpublish_at <= now()
+     and (new.unpublish_at is null or new.unpublish_at > now()) then
+    raise exception 'Review is required: bringing back a post past its end date goes through staging and a teammate''s approval.'
+      using errcode = 'check_violation';
   end if;
   -- Nothing the site shows changes.
   if not content_changed and new.status = old.status
@@ -212,7 +226,9 @@ create table if not exists public.blog_post_revisions (
   id uuid primary key default gen_random_uuid(),
   -- Save order: saved_at can tie inside one transaction.
   seq bigint generated always as identity,
-  post_id uuid not null references public.blog_posts(id) on delete cascade,
+  -- No foreign key: deleting a post (an ordinary admin right) keeps its
+  -- history, so one admin cannot erase what a live post said.
+  post_id uuid not null,
   title text not null,
   slug text not null,
   excerpt text,
@@ -346,6 +362,30 @@ begin
   end if;
 end
 $$;
+
+-- A post that goes back to draft, by any path, loses its end date, so
+-- publishing it again later is not refused by the check above and it does
+-- not vanish at an old date. (Before triggers run in name order, so this one
+-- runs before blog_posts_two_person_lock sees the row.)
+create or replace function public.blog_posts_clear_end_date()
+  returns trigger
+  language plpgsql
+  set search_path = ''
+as $$
+begin
+  if new.status = 'draft' then
+    new.unpublish_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.blog_posts_clear_end_date() from public, anon, authenticated;
+
+drop trigger if exists blog_posts_clear_end_date on public.blog_posts;
+create trigger blog_posts_clear_end_date
+  before insert or update on public.blog_posts
+  for each row execute function public.blog_posts_clear_end_date();
 
 create index if not exists blog_posts_unpublish_at_idx
   on public.blog_posts (unpublish_at) where unpublish_at is not null;

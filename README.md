@@ -102,7 +102,7 @@ npm install
 npm test
 ```
 
-The tests load all four migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave and restoring a revision. 174 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
+The tests load all four migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave and restoring a revision. 180 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 

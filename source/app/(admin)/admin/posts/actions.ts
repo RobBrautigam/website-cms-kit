@@ -88,7 +88,7 @@ export async function togglePostStatus(
     .from("blog_posts")
     .update(updates)
     .eq("id", id)
-    .select("id")
+    .select("id, featured_image_url, body")
     .maybeSingle();
   const wrapped = wrapSupabaseError(error);
   if (wrapped) return wrapped;
@@ -102,7 +102,8 @@ export async function togglePostStatus(
   revalidatePath("/admin/posts");
   revalidatePath("/blog");
   if (goingLive) {
-    const failed = await promoteImages(goingLive, id);
+    // Promote from the row as written, never the one read before the write.
+    const failed = await promoteImages(data, id);
     if (failed)
       return ok({
         imageWarning: `Published, but an image could not be made public yet. Open the post and press Make images public to try again. ${failed}`,
@@ -226,13 +227,16 @@ export async function bulkPostAction(
   for (const id of plan.apply) {
     const post = byId.get(id)!;
     let error;
+    let written: { featured_image_url?: unknown; body?: unknown } | null = null;
     if (action === "delete") {
       ({ error } = await supabase.from("blog_posts").delete().eq("id", id));
     } else if (action === "publish") {
-      ({ error } = await supabase
+      ({ error, data: written } = await supabase
         .from("blog_posts")
         .update({ status: "published", published_at: new Date().toISOString() })
-        .eq("id", id));
+        .eq("id", id)
+        .select("featured_image_url, body")
+        .maybeSingle());
     } else {
       ({ error } = await supabase.from("blog_posts").update({ status: "draft" }).eq("id", id));
     }
@@ -242,7 +246,7 @@ export async function bulkPostAction(
     }
     applied.push(id);
     // The images go public only after the publish write succeeded.
-    if (action === "publish" && (await promoteImages(post, id))) imagesPending.push(post.title as string);
+    if (action === "publish" && written && (await promoteImages(written, id))) imagesPending.push(post.title as string);
     await recordAdminAction({
       action:
         action === "delete" ? "blog_post.delete" : action === "publish" ? "blog_post.publish" : "blog_post.unpublish",

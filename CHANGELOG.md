@@ -14,7 +14,7 @@ Revisions, scheduled publishing, and the fixes the 1.3.0 review left open. Run `
 - **A Schedule panel** on live and scheduled posts, and the date fields say they are UTC (they were read in the browser's zone and saved as UTC, which moved a date on every save).
 - **Staged image cleanup** in Settings (super admin): unused staged images older than 48 hours are removed, with an audit row.
 - **A kit-local type-check** (`source/typecheck/`) against the Next.js 16.4 types, with no borrowed `node_modules`.
-- `docs/12-revisions-and-scheduling.md`, and 41 more tests (174 in all): migration 003 on PGlite, the new route and action behavior against stand-ins, and the new helpers, each seen failing first.
+- `docs/12-revisions-and-scheduling.md`, and 47 more tests (180 in all): migration 003 on PGlite, the new route and action behavior against stand-ins, and the new helpers, each seen failing first.
 
 ### Security
 
@@ -23,6 +23,7 @@ Revisions, scheduled publishing, and the fixes the 1.3.0 review left open. Run `
 - **The redirect counter and the audit log key on the address the trusted proxy wrote** (`TRUSTED_PROXY_HOPS`), never the visitor's first `X-Forwarded-For` entry.
 - **Password re-checks and recovery codes are limited per admin** (5 tries in 15 minutes each), and every wrong password, wrong code and limited try writes an audit row.
 - **The AI routes:** the request is checked before any budget is spent, the inputs refuse unknown keys, a daily cap per admin (100 calls) sits behind the ten-minute limit, and every call leaves a spend record (`ai_usage`) with its token counts; no record, no call.
+- **Review fixes before release:** a promoted image is never copied again, so deleting a public file and uploading a new one at its staged path cannot swap it; bringing back a post past its end date needs approval; a post that goes back to draft loses its end date on every path; revisions outlive a deleted post; a redirect with no recorded changer waits for an edit and a teammate; posts promote images from the row as written; an AI call the API refused is marked `refused`; the audit log no longer reads `cf-connecting-ip`.
 - **Live-post autosave is quiet and never resets a review:** it writes only a staged copy nobody has sent for review, and audits only the one that creates the copy. An explicit save waits for an autosave in flight.
 - **HSTS defaults to `max-age` alone;** `HSTS_PRELOAD=1` adds `includeSubDomains; preload` (docs/09).
 - **Session lifetime and idle timeout chosen and documented** (docs/09): a 12-hour time-box, a 2-hour idle timeout, a one-hour access token.

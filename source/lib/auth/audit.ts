@@ -92,10 +92,10 @@ export interface RecordAdminActionInput {
  * console.error but never throw - losing an audit row is preferable to
  * breaking a mutation.
  *
- * Extracts the client IP, preferring the edge-set `cf-connecting-ip` (Cloudflare
- * populates it and the client cannot spoof it), else the X-Forwarded-For entry the
- * trusted proxy wrote (clientAddress in lib/security/rate-limit.ts, never the
- * client-written first entry), else `x-real-ip`; and the user-agent, when available.
+ * Extracts the client IP the same way the rate limits do: the X-Forwarded-For
+ * entry the trusted proxy wrote (clientAddress in lib/security/rate-limit.ts,
+ * TRUSTED_PROXY_HOPS, never the client-written first entry), else `x-real-ip`;
+ * and the user-agent, when available.
  */
 export async function recordAdminAction(
   input: RecordAdminActionInput
@@ -120,9 +120,11 @@ export async function recordAdminAction(
       actor_email = actor_email ?? "(unknown)";
     }
 
+    // The same address the rate limits use: the entry the trusted proxy wrote
+    // (TRUSTED_PROXY_HOPS). A cf-connecting-ip header is not read: without
+    // Cloudflare in front, the visitor writes it.
     const proxied = clientAddress(h);
-    const ip =
-      h.get("cf-connecting-ip") ?? (proxied === "unknown" ? null : proxied);
+    const ip = proxied === "unknown" ? null : proxied;
 
     const svc = createServiceClient();
     const { error } = await svc.from("admin_audit_log").insert({

@@ -326,3 +326,48 @@ test('review required: an approved staged copy of a scheduled post publishes int
   const [p] = await peek(`select title, status from public.blog_posts where id = $1`, [LATER])
   assert.deepEqual([p.title, p.status], ['Later, edited', 'scheduled'])
 }))
+
+// The review fixes (the session's one reviewer).
+
+test('review required: one admin cannot bring back a post past its end date by clearing or moving the end date', () => scenario(async () => {
+  await asOwner()
+  await db.query(`update public.blog_posts set unpublish_at = now() - interval '1 minute' where id = $1`, [LIVE])
+  await requireReview()
+  await asUser(ADMIN)
+  await expectError(`update public.blog_posts set unpublish_at = null where id = $1`, [LIVE], /Review is required/)
+  await expectError(`update public.blog_posts set unpublish_at = now() + interval '1 day' where id = $1`, [LIVE], /Review is required/)
+  // An end date that has not passed can still be moved, and taking the post down stays free.
+  await rows(`update public.blog_posts set unpublish_at = now() + interval '10 days' where id = $1`, [LATER])
+  await rows(`update public.blog_posts set unpublish_at = now() + interval '20 days' where id = $1`, [LATER])
+  await rows(`update public.blog_posts set status = 'draft' where id = $1`, [LIVE])
+}))
+
+test('taking a post down clears its end date, so it can be published again later', () => scenario(async () => {
+  await asUser(ADMIN)
+  await rows(`update public.blog_posts set unpublish_at = now() + interval '2 days' where id = $1`, [LIVE])
+  await rows(`update public.blog_posts set status = 'draft' where id = $1`, [LIVE])
+  const [p] = await peek(`select unpublish_at from public.blog_posts where id = $1`, [LIVE])
+  assert.equal(p.unpublish_at, null)
+  await rows(`update public.blog_posts set status = 'published', published_at = now() + interval '3 days' where id = $1`, [LIVE])
+}))
+
+test('deleting a post keeps its revisions', () => scenario(async () => {
+  await asUser(ADMIN)
+  await rows(`update public.blog_posts set status = 'draft' where id = $1`, [LIVE])
+  assert.equal((await revisionsOf(LIVE)).length, 1)
+  await rows(`delete from public.blog_posts where id = $1`, [LIVE])
+  assert.equal((await revisionsOf(LIVE)).length, 1)
+}))
+
+test('review required: a redirect with no recorded changer (from before the lock) is not switched on by one admin', () => scenario(async () => {
+  await asOwner()
+  await db.query(`update public.url_redirects set enabled = false where id = $1`, [REDIRECT])
+  await requireReview()
+  await asUser(ADMIN)
+  await expectError(`update public.url_redirects set enabled = true where id = $1`, [REDIRECT], /teammate/)
+  // Saving it once records the changer; then a teammate switches it on.
+  await rows(`update public.url_redirects set destination = '/newer' where id = $1`, [REDIRECT])
+  await asUser(SUPER)
+  const [on] = await rows(`update public.url_redirects set enabled = true where id = $1 returning *`, [REDIRECT])
+  assert.equal(on.enabled, true)
+}))

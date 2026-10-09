@@ -50,6 +50,7 @@ export function resetStubs() {
   calls.order = []
   fakes.aiAllowed = true
   fakes.modelText = '[]'
+  fakes.modelError = null
   fakes.storage = { staged: new Set(), public: new Set(), failCopy: null }
   fakes.limits = {}
   fakes.tables = {}

@@ -39,8 +39,15 @@ export async function promoteImages(
     if (claim.error && !claimedBefore) {
       return `An image could not be made public (the promotion ledger: ${claim.error.message}). Check that migration 003 has run.`
     }
+    // The kit made this path public once already. Never copy it again: if the
+    // public file is gone, a new staged upload at the same path would be an
+    // unreviewed swap. Only the leftover staged copy is cleaned up.
+    if (claimedBefore) {
+      promoted.push(path)
+      continue
+    }
     const drop = async () => {
-      if (!claimedBefore) await ledger().delete().eq('path', path)
+      await ledger().delete().eq('path', path)
     }
     const { error } = await storage.from(STAGED_BUCKET).copy(path, path, { destinationBucket: PUBLIC_BUCKET })
     if (!error) {
@@ -53,10 +60,6 @@ export async function promoteImages(
       continue
     }
     if (/already exists|duplicate/i.test(message)) {
-      if (claimedBefore) {
-        promoted.push(path)
-        continue
-      }
       await drop()
       return `An image is already public but was not made public by the kit (${path}). Remove it from the public bucket, or upload the image again.`
     }

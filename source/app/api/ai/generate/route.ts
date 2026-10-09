@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 502 })
     return NextResponse.json(parsed.data)
   } catch (e) {
+    await spend.failed(e)
     console.error('AI generation error:', e)
     return NextResponse.json({ error: 'Generation failed.' }, { status: 500 })
   }
