@@ -10,8 +10,9 @@ import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/
 import { requireAdmin, requireSuperAdmin } from "@/lib/auth/require";
 import { altTextRefusal } from "@/lib/admin/alt-text";
 import { promoteImages } from "@/lib/staging/promote-images";
-import { STAGED_BUCKET, imagePathsIn } from "@/lib/staging/images";
+import { STAGED_BUCKET, imagePathsIn, imagePathsInTestimonial } from "@/lib/staging/images";
 import { planOrphanCleanup } from "@/lib/staging/orphans";
+import { imagesAtPublishDate, imagesWaitForDate } from "@/lib/staging/scheduled-images";
 import { recordAdminAction } from "@/lib/auth/audit";
 import {
   ok,
@@ -282,12 +283,31 @@ export async function publishStaged(
  * Make the images of posts that just went live public. A failure here is
  * not a failed publish (the posts ARE live), so it comes back as a warning;
  * the editor offers "Make images public" (promotePostImages) to try again.
+ * With SCHEDULED_IMAGES=at_publish, a post that is scheduled beyond the lead
+ * time keeps its images private: the scheduled-publishing job copies them at
+ * its date (lib/staging/scheduled-images.ts). Its status is read after the
+ * publish, since publishing a staged change keeps a scheduled post scheduled.
  */
 async function promoteAfterPublish(
   rows: { post_id: string; title: string; featured_image_url?: unknown; body?: unknown }[]
 ): Promise<string | undefined> {
+  let waiting = new Set<string>();
+  if (imagesAtPublishDate() && rows.length > 0) {
+    const { data, error } = await createServiceClient()
+      .from("blog_posts")
+      .select("id, status, published_at")
+      .in("id", rows.map((r) => r.post_id));
+    // Unread, nothing is copied: a post scheduled for later must not go public
+    // early (1.5.0 review). Make images public, or the job at the date, does it.
+    if (error) {
+      console.error("promoteAfterPublish: schedule not read", error.message);
+      return "Published, but the images were not made public: the post's schedule could not be read. Open the post and press Make images public; a scheduled post's images go public at its date.";
+    }
+    waiting = new Set((data ?? []).filter((p) => imagesWaitForDate(p)).map((p) => p.id as string));
+  }
   const problems: string[] = [];
   for (const r of rows) {
+    if (waiting.has(r.post_id)) continue;
     const failed = await promoteImages(r, r.post_id);
     if (failed) problems.push(`"${r.title}": ${failed}`);
   }
@@ -350,13 +370,13 @@ export async function prepareToGoLive(content: {
  * from the stored post, never from the caller, and a draft is refused: its
  * content has not been through the publish path (or the lock) yet.
  */
-export async function promotePostImages(postId: string): Promise<ActionResult> {
+export async function promotePostImages(postId: string): Promise<ActionResult<{ waitsForDate?: boolean }>> {
   await requireAdmin();
   if (!UUID.test(postId)) return err("Unknown post.", "validation");
   const supabase = await createServerSupabaseClient();
   const { data: post, error } = await supabase
     .from("blog_posts")
-    .select("id, title, status, featured_image_url, body")
+    .select("id, title, status, published_at, featured_image_url, body")
     .eq("id", postId)
     .maybeSingle();
   const wrapped = wrapSupabaseError(error);
@@ -364,6 +384,8 @@ export async function promotePostImages(postId: string): Promise<ActionResult> {
   if (!post) return err("Post not found.", "not_found");
   if (post.status !== "published" && post.status !== "scheduled")
     return err("Only a live or scheduled post's images are made public. Publish the post first.", "validation");
+  // SCHEDULED_IMAGES=at_publish: the scheduled-publishing job copies them at the date.
+  if (imagesWaitForDate(post)) return ok({ waitsForDate: true });
   const failed = await promoteImages(post, postId);
   if (failed) return err(failed, "server");
   await recordAdminAction({
@@ -572,6 +594,16 @@ export async function cleanupStagedImages(): Promise<ActionResult<{ removed: num
       if (!data || data.length < PAGE) break;
     }
   }
+  // Testimonials upload into the same staged bucket (1.5.0: they were missed).
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await svc
+      .from("testimonials")
+      .select("headshot_url, screenshot_url, video_thumbnail_url")
+      .range(from, from + PAGE - 1);
+    if (error) return err(`Could not read testimonials: ${error.message}`, "server");
+    for (const row of data ?? []) for (const p of imagePathsInTestimonial(row)) referenced.add(p);
+    if (!data || data.length < PAGE) break;
+  }
   const objects: { name: string; created_at: string | null }[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await svc.storage
@@ -581,7 +613,16 @@ export async function cleanupStagedImages(): Promise<ActionResult<{ removed: num
     for (const o of data ?? []) objects.push({ name: o.name, created_at: o.created_at ?? null });
     if (!data || data.length < PAGE) break;
   }
-  const remove = planOrphanCleanup(objects, [...referenced]);
+  // The database's in-use check (migration 004) is the same one the delete
+  // policies use; it also sees an address in a link or a resized-image URL,
+  // which the image extractor above does not read (1.5.0 review). A failed
+  // check keeps the file.
+  const supabase = await createServerSupabaseClient();
+  const remove: string[] = [];
+  for (const path of planOrphanCleanup(objects, [...referenced])) {
+    const { data: inUse, error } = await supabase.rpc("blog_image_in_use", { image_path: path });
+    if (!error && inUse === false) remove.push(path);
+  }
   for (let i = 0; i < remove.length; i += 100) {
     const { error } = await svc.storage.from(STAGED_BUCKET).remove(remove.slice(i, i + 100));
     if (error) return err(`Could not remove the staged images: ${error.message}`, "server");

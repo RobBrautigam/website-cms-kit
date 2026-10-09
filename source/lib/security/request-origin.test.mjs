@@ -58,10 +58,12 @@ test('a POST from a page on this site passes, also behind a proxy', () => {
 })
 
 // Every route handler that changes something on a cookie session calls the
-// check first. The one exception is the redirect beacon: it is public, has
-// no session and only bumps a rate-limited counter.
+// check first. The exceptions: the redirect beacon (public, no session, only
+// bumps a rate-limited counter) and the scheduler's job (no cookie at all:
+// a bearer secret, checked first by cronRefusal).
 const API = fileURLToPath(new URL('../../app/api/', import.meta.url))
 const PUBLIC_BEACONS = new Set(['redirects/hit/[id]/route.ts'])
+const BEARER_ONLY = new Set(['cron/scheduled-publishing/route.ts'])
 
 function routes(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -78,6 +80,16 @@ test('every state-changing cookie route runs the same-site check before its auth
     const src = readFileSync(file, 'utf8')
     const handlers = [...src.matchAll(/export async function (POST|PUT|PATCH|DELETE)\b/g)]
     if (handlers.length === 0 || PUBLIC_BEACONS.has(rel)) continue
+    if (BEARER_ONLY.has(rel)) {
+      for (const h of handlers) {
+        const body = src.slice(h.index)
+        const check = body.search(/cronRefusal\(/)
+        const work = body.search(/createServiceClient\(|createServerSupabaseClient\(|cookies\(/)
+        assert.ok(check > 0 && (work === -1 || check < work), `${rel} ${h[1]} must run cronRefusal() first`)
+        assert.ok(!/cookies\(|createServerSupabaseClient\(/.test(src), `${rel} must not read a cookie session`)
+      }
+      continue
+    }
     for (const h of handlers) {
       const body = src.slice(h.index)
       const check = body.search(/crossSiteRefusal\(/)

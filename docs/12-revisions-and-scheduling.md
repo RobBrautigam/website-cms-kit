@@ -51,7 +51,7 @@ It answers `{"published": n, "unpublished": n}`. Only the service role may run i
 
 **Cached public pages.** The scheduler changes rows; Next.js does not hear about it. A public page rendered on each request is correct at once. A statically rendered or ISR page shows the change at its next revalidation, so give blog pages a short `export const revalidate = 60` (one minute, the scheduler's own step), or render them dynamically.
 
-**Images of a scheduled post.** They are made public when the post is scheduled (right after that save succeeds), because the scheduler runs in the database and cannot copy storage objects. Their addresses are long random names that nothing links to until the post is live.
+**Images of a scheduled post.** By default they are made public when the post is scheduled (right after that save succeeds), because the scheduler runs in the database and cannot copy storage objects. Their addresses are long random names that nothing links to until the post is live. Since 1.5.0, `SCHEDULED_IMAGES=at_publish` keeps them private until the post's date: a server route copies them just ahead of it, called every minute by Supabase Cron through `pg_net` in place of the job above ([docs/13](13-media-library.md#the-images-of-a-scheduled-post)).
 
 ## How other CMSs do it (read 2026-10-08)
 

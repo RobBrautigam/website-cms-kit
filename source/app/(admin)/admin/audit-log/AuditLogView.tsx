@@ -37,6 +37,7 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
     actions:
       "blog_post.restore_revision,blog_post.schedule_update,blog_post.scheduled_publish,blog_post.scheduled_unpublish",
   },
+  { label: "Media", actions: "media.alt_update,media.delete" },
   { label: "Jobs", actions: "job.create,job.update,job.delete" },
   {
     label: "Testimonials",

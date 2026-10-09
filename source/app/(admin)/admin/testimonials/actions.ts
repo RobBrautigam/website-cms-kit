@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/require";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { sanitizeQuote } from "@/lib/supabase/testimonials";
+import { PUBLIC_BUCKET, imagePathsInTestimonial } from "@/lib/staging/images";
+import { promoteImagePaths } from "@/lib/staging/promote-images";
 import {
   ok,
   err,
@@ -34,6 +36,43 @@ function parseFloatOrNull(value: FormDataEntryValue | null): number | null {
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * A testimonial saves live, so its pictures go public with it (1.5.0). Since
+ * 1.3.0 an upload lands in the private staged bucket, and before this they
+ * were never copied across. The same ledger as posts decides, so an object
+ * the kit did not promote is still refused. Returns null, or the message.
+ */
+async function publishTestimonialImages(
+  row: Parameters<typeof imagePathsInTestimonial>[0],
+  id: string
+): Promise<ActionResult | null> {
+  // An image a post, staged change or revision uses goes public with that
+  // post, never with a testimonial: testimonials are outside the two-person
+  // lock, so this would let one admin publish a post's image early (1.5.0
+  // review). A failed check copies nothing.
+  const svc = createServiceClient();
+  const own: string[] = [];
+  const waiting: string[] = [];
+  for (const path of imagePathsInTestimonial(row)) {
+    const { data: inPosts, error } = await svc.rpc("blog_image_in_posts", { image_path: path });
+    if (error || inPosts !== false) {
+      const { data: isPublic } = await svc.storage.from(PUBLIC_BUCKET).exists(path);
+      if (isPublic !== true) waiting.push(path);
+      continue;
+    }
+    own.push(path);
+  }
+  const failed = await promoteImagePaths(own, id);
+  if (failed) return err(`Saved. ${failed}`, "server");
+  if (waiting.length > 0) {
+    return err(
+      `Saved. An image a post uses goes public with that post, not with a testimonial, so it stays private until then (${waiting.join(", ")}). Upload a separate copy for the testimonial to show it now.`,
+      "server"
+    );
+  }
+  return null;
 }
 
 function parseFormData(formData: FormData) {
@@ -91,7 +130,7 @@ export async function createTestimonial(
   });
   revalidatePath("/admin/testimonials");
   revalidatePath("/results");
-  return ok();
+  return (await publishTestimonialImages(payload, inserted.id as string)) ?? ok();
 }
 
 export async function updateTestimonial(
@@ -119,7 +158,7 @@ export async function updateTestimonial(
   });
   revalidatePath("/admin/testimonials");
   revalidatePath("/results");
-  return ok();
+  return (await publishTestimonialImages(payload, id)) ?? ok();
 }
 
 export async function deleteTestimonial(id: string): Promise<ActionResult> {

@@ -137,6 +137,15 @@ export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: Po
       <ImageUploader
         currentUrl={meta.featuredImageUrl}
         onUpload={(url) => update({ featuredImageUrl: url })}
+        // A library pick offers the alt text kept for the image; the post keeps
+        // its own copy, so an alt already typed here is not overwritten.
+        onPick={(url, alt) =>
+          update(
+            alt && !meta.featuredImageAlt.trim()
+              ? { featuredImageUrl: url, featuredImageAlt: alt }
+              : { featuredImageUrl: url }
+          )
+        }
       />
 
       {/* Image Alt: required before the post goes live (lib/admin/alt-text.ts) */}

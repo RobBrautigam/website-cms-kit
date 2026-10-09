@@ -191,7 +191,7 @@ test('publishing writes the post first and only then makes its images public', a
   calls.order = []
   const done = await publishStaged([STAGE_ID])
   assert.equal(done.ok, true)
-  assert.deepEqual(calls.order, ['rpc publish_staged_posts', `copy ${A}`])
+  assert.deepEqual(calls.order, ['rpc publish_staged_posts', `copy ${A}`, `remove blog-images-staged ${A}`])
   assert.deepEqual([...fakes.storage.public], [A])
 })
 
@@ -282,4 +282,59 @@ test('AI: a call the API refused (4xx) is recorded as refused; a timeout stays a
   fakes.modelError = new Error('socket hang up')
   assert.equal((await POST(post('/api/ai/suggest-title', { excerpt: 'x' }))).status, 500)
   assert.equal(fakes.tables.ai_usage[1].status, 'started')
+})
+
+// Owed from 1.4.0's review (findings 2 and 6), written in 1.5.0.
+
+const posts = () => import(new URL('../../app/(admin)/admin/posts/actions.ts', import.meta.url).href)
+const draftWith = (path) => ({
+  id: POST_ID, title: 'Dry gardens', slug: 'dry-gardens', status: 'draft',
+  featured_image_url: IMG(path), featured_image_alt: 'A gravel path', body: { type: 'doc', content: [] },
+})
+// A teammate saves a different featured image between the read and the publish write.
+// (a new row object: what the action read before stays as it was read)
+const teammateSwapsTo = (path) => (rows) => { rows[0] = { ...rows[0], featured_image_url: IMG(path) } }
+
+test('finding 2: publishing from the posts list makes public the images of the row as written, not the one read before', async () => {
+  const { togglePostStatus } = await posts()
+  fakes.tables.blog_posts = [draftWith(A)]
+  fakes.storage.staged.add(A)
+  fakes.storage.staged.add(B)
+  fakes.beforeUpdate.blog_posts = teammateSwapsTo(B)
+  const r = await togglePostStatus(POST_ID, true)
+  assert.equal(r.ok, true)
+  assert.deepEqual([...fakes.storage.public], [B])
+  assert.equal(fakes.storage.staged.has(A), true)
+})
+
+test('finding 2: bulk publish does the same, image by image from each written row', async () => {
+  const { bulkPostAction } = await posts()
+  fakes.tables.blog_posts = [draftWith(A)]
+  fakes.tables.blog_post_staged_changes = []
+  fakes.storage.staged.add(A)
+  fakes.storage.staged.add(B)
+  fakes.beforeUpdate.blog_posts = teammateSwapsTo(B)
+  const r = await bulkPostAction('publish', [POST_ID])
+  assert.equal(r.ok, true)
+  assert.equal(r.data.applied, 1)
+  assert.deepEqual([...fakes.storage.public], [B])
+})
+
+test('finding 6: the audit log stores the address the trusted proxy wrote, never a header the visitor can set', async () => {
+  // The real recorder (the other tests use a stand-in), with no Cloudflare in front.
+  const { recordAdminAction } = await import(new URL('../../lib/auth/audit.ts', import.meta.url).href)
+  fakes.headers = {
+    'x-forwarded-for': '198.51.100.66, 203.0.113.9',
+    'cf-connecting-ip': '198.51.100.66',
+    'user-agent': 'sample-agent',
+  }
+  await recordAdminAction({ action: 'blog_post.publish', actor_user_id: ADMIN_ID, actor_email: 'admin@example.com' })
+  const [row] = fakes.tables.admin_audit_log
+  assert.equal(row.ip_address, '203.0.113.9')
+  assert.equal(row.user_agent, 'sample-agent')
+  // No proxy header at all: stored as unknown (null), never a guess.
+  fakes.tables.admin_audit_log = []
+  fakes.headers = { 'cf-connecting-ip': '198.51.100.66' }
+  await recordAdminAction({ action: 'blog_post.publish', actor_user_id: ADMIN_ID, actor_email: 'admin@example.com' })
+  assert.equal(fakes.tables.admin_audit_log[0].ip_address, null)
 })

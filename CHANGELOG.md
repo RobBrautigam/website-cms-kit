@@ -2,6 +2,36 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.5.0 (2026-10-09)
+
+The media library, and an optional server job for the images of scheduled posts. Run `004_media_library.sql` after 003. Full detail in [docs/13](docs/13-media-library.md).
+
+### Added
+
+- **A media library** (Media in the sidebar). Every image in both buckets on one screen: Private (waiting for its post), Public (made public by the kit, with the date), or Not promoted by the kit; the posts, staged changes, kept revisions and testimonials that use it, each linked; filters for unused images and missing alt text; upload.
+- **Alt text per image, offered on reuse.** Kept in a new `blog_media` table, which records who changed it and when. Picking an image in the editor prefills its alt text; picking a featured image fills the alt field when it is empty; the first alt text given for an image without one is saved back. Each post can still word its own.
+- **Reuse without a second upload.** The editor's Image button and the featured image open the library and use the image's existing address; a second post going live copies nothing again.
+- **An optional job for scheduled posts' images.** With `SCHEDULED_IMAGES=at_publish`, a scheduled post's images stay private until its date; `POST /api/cron/scheduled-publishing`, called every minute with `CRON_SECRET`, copies them through the promotion ledger up to two minutes ahead and then runs the scheduler. Off by default, so nothing changes for a site that does not set it up (review finding 8 of 1.4.0).
+- `docs/13-media-library.md`, and 46 more tests (226 in all): migration 004 on PGlite, the media actions, the library's logic, the scheduled-images job, and three tests owed from 1.4.0's review (images promoted from the row as written, on the toggle and on the bulk path; the audit log's address from the real audit writer), each seen failing first.
+
+### Security
+
+- **An image in use is never deleted, overwritten or moved.** `blog_image_in_use()` checks live posts, staged changes, kept revisions and testimonials, and both buckets' delete and update policies call it, so no admin client can remove a used image through the Storage API; the library's delete asks first and refuses before touching storage. The check answers only an active admin with two-factor done and only for a kit path, so nobody can use it to probe draft text.
+- **The promotion ledger stays the only door to the public bucket.** Migration 004 grants no public-bucket write, an alt text row opens nothing, staged images stay write-once under review, and deleting a public image keeps its ledger row, so a later upload at that path is never copied into its place.
+- **Two older gaps in the ledger closed.** A path a post names that exists in neither bucket keeps its claim, so a file uploaded there after approval is never promoted; and a request that finds a path already claimed no longer removes the staged file another request is still copying.
+- **A testimonial save never makes a post's image public;** it waits for its post. A publish that cannot read a post's schedule copies no image under `at_publish`, and the job also copies the images of posts the database-only scheduler published first.
+- **The scheduled-publishing route** checks its bearer secret first (503 without a secret of at least 32 characters, 401 for a wrong one, compared in constant time), reads no cookie, answers failures with fixed text, and is held to that by the route scan.
+
+### Fixed
+
+- **Testimonial images go public.** Since 1.3.0 a new headshot, screenshot or video thumbnail uploaded to the private bucket and never reached the public one, and the 48-hour cleanup would have removed it. A testimonial's images are now made public when it is saved, through the same ledger, and the cleanup keeps them.
+
+### Changed
+
+- `APP_VERSION` reads `v1.5.0`; the demo's media library is real (no longer marked Proposed).
+- The library's delete and alt text changes are audited (`media.delete`, `media.alt_update`), with a Media filter in the audit log.
+- SECURITY.md: used images cannot be deleted, the scheduled-images choice, testimonial images outside the lock, and the route's shared secret.
+
 ## 1.4.0 (2026-10-08)
 
 Revisions, scheduled publishing, and the fixes the 1.3.0 review left open. Run `003_revisions_and_scheduling.sql` after 002. Full detail in [docs/12](docs/12-revisions-and-scheduling.md).

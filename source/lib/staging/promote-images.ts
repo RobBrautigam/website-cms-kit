@@ -14,10 +14,13 @@ import { PUBLIC_BUCKET, STAGED_BUCKET, imagePathsIn } from './images'
  * migration 003, section 22), so the kit can tell its own public copies from
  * an object somebody wrote into the public bucket directly:
  *   - copied: promoted;
- *   - not in the staged bucket: skipped (promoted already, or uploaded before
- *     1.3.0 straight to the public bucket); a fresh claim is dropped;
- *   - already public, and the ledger says the kit put it there: promoted (a
- *     retry after the staged copy's removal failed);
+ *   - not in the staged bucket but public (uploaded before 1.3.0 straight to
+ *     the public bucket): skipped, and the fresh claim is dropped;
+ *   - in neither bucket: refused, and the claim is kept (1.5.0), so a file
+ *     uploaded at that path later is never promoted;
+ *   - claimed before and public: promoted (a retry after the staged copy's
+ *     removal failed); claimed before and not public yet: refused without
+ *     touching the staged copy, which another request may be copying;
  *   - already public, and the kit did not put it there: refused, because that
  *     object never went through review.
  *
@@ -27,7 +30,16 @@ export async function promoteImages(
   content: { featured_image_url?: unknown; body?: unknown },
   postId: string
 ): Promise<string | null> {
-  const paths = imagePathsIn(content)
+  return promoteImagePaths(imagePathsIn(content), postId)
+}
+
+/**
+ * The same promotion for a list of paths. Testimonials use it (1.5.0): their
+ * pictures upload into the same staged bucket and go public when the
+ * testimonial is saved, since testimonials save live. The ledger's post_id
+ * then holds the testimonial's id.
+ */
+export async function promoteImagePaths(paths: string[], postId: string): Promise<string | null> {
   if (paths.length === 0) return null
   const svc = createServiceClient()
   const storage = svc.storage
@@ -39,10 +51,16 @@ export async function promoteImages(
     if (claim.error && !claimedBefore) {
       return `An image could not be made public (the promotion ledger: ${claim.error.message}). Check that migration 003 has run.`
     }
-    // The kit made this path public once already. Never copy it again: if the
-    // public file is gone, a new staged upload at the same path would be an
-    // unreviewed swap. Only the leftover staged copy is cleaned up.
+    // The kit claimed this path already. Never copy it again: if the public
+    // file is gone, a new staged upload at the same path would be an
+    // unreviewed swap. The leftover staged copy is cleaned up only once the
+    // public copy exists; until then another request may still be copying it
+    // (1.5.0 review: removing it then lost the image).
     if (claimedBefore) {
+      const { data: isPublic } = await storage.from(PUBLIC_BUCKET).exists(path)
+      if (isPublic !== true) {
+        return `An image is still being made public, or its public file was removed (${path}). Try again in a minute; if it stays, upload the image again.`
+      }
       promoted.push(path)
       continue
     }
@@ -56,8 +74,16 @@ export async function promoteImages(
     }
     const message = error.message ?? ''
     if (/not.?found|does not exist/i.test(message)) {
-      await drop()
-      continue
+      // Not staged. A public file from before 1.3.0 is served as it is and not
+      // adopted into the ledger. A file that exists nowhere keeps its claim
+      // (1.5.0 review), so nothing uploaded at that path after the post's
+      // approval can ever be copied into its place.
+      const { data: isPublic } = await storage.from(PUBLIC_BUCKET).exists(path)
+      if (isPublic === true) {
+        await drop()
+        continue
+      }
+      return `An image the post names does not exist (${path}), so it was not made public. Upload the image again; it gets a new name.`
     }
     if (/already exists|duplicate/i.test(message)) {
       await drop()

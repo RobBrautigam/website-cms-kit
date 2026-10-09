@@ -15,7 +15,7 @@
   var STORE_KEY = 'cmskit-demo-v2';
   var THEME_KEY = 'cmskit-demo-theme';
   var SESSION_KEY = 'cmskit-demo-session';
-  var DEMO_VERSION = 'v1.3.0 demo';
+  var DEMO_VERSION = 'v1.5.0 demo';
   var DEMO_TOTP = '123456';
   var CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
   var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -142,8 +142,12 @@
       { id: uid(), name: 'field-notes.svg', type: 'image/svg+xml', size: 1480, w: 640, h: 480, alt: 'Abstract teal gradient with waves', src: art(170, 200, 'waves'), createdAt: daysAgo(24) },
       { id: uid(), name: 'grid-study.svg', type: 'image/svg+xml', size: 1610, w: 640, h: 480, alt: 'Abstract violet gradient with a grid', src: art(260, 290, 'grid'), createdAt: daysAgo(18) },
       { id: uid(), name: 'summit.svg', type: 'image/svg+xml', size: 1390, w: 640, h: 480, alt: 'Abstract amber gradient with mountain peaks', src: art(30, 10, 'peaks'), createdAt: daysAgo(9) },
-      { id: uid(), name: 'quiet-hours.svg', type: 'image/svg+xml', size: 1450, w: 640, h: 480, alt: 'Abstract rose gradient with waves', src: art(340, 310, 'waves'), createdAt: daysAgo(3) }
+      { id: uid(), name: 'quiet-hours.svg', type: 'image/svg+xml', size: 1450, w: 640, h: 480, alt: 'Abstract rose gradient with waves', src: art(340, 310, 'waves'), createdAt: daysAgo(3) },
+      { id: uid(), name: 'garden-plan.svg', type: 'image/svg+xml', size: 1600, w: 640, h: 480, alt: 'Abstract green gradient with a grid', src: art(120, 150, 'grid'), createdAt: daysAgo(0, 6) },
+      { id: uid(), name: 'new-upload.svg', type: 'image/svg+xml', size: 1500, w: 640, h: 480, alt: '', src: art(45, 15, 'circles'), createdAt: daysAgo(0, 1) }
     ];
+    // 1.5.0: the first five are public (their posts went live or were scheduled); the last two are private uploads.
+    media.slice(0, 5).forEach(function (m) { m.promotedAt = m.createdAt; });
     function post(o) {
       var content = { title: o.title, slug: slugify(o.title), excerpt: o.excerpt, metaDescription: o.meta || o.excerpt, category: o.category, cover: o.cover || '', body: o.body };
       var rec = { id: uid(), status: o.status, author: o.author, createdAt: daysAgo(o.age + 2), updatedAt: daysAgo(o.age, o.hours || 0), publishedAt: o.status === 'published' ? daysAgo(o.age) : null, publishAt: o.publishAt || null, draft: content, live: o.status === 'published' ? clone(content) : null };
@@ -176,7 +180,7 @@
       post({ title: 'A practical guide to redirects after a redesign', status: 'scheduled', category: 'Guides', author: 'Avery Park', age: 1, publishAt: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(), cover: media[4].src,
         excerpt: 'Map every old address to its new home before launch day, not after.',
         body: doc(p('A redesign that drops old addresses loses the links other sites gave you. A redirect map keeps them.'), ul(['Export every old path', 'Match each to its new page', 'Use permanent redirects for moved pages']), p('The Redirects screen tests each rule before it goes live.')) }),
-      post({ title: 'Draft: questions to ask before you pick a CMS', status: 'draft', category: 'Guides', author: 'Sam Ortiz', age: 0, hours: 5,
+      post({ title: 'Draft: questions to ask before you pick a CMS', status: 'draft', category: 'Guides', author: 'Sam Ortiz', age: 0, hours: 5, cover: media[5].src,
         excerpt: 'Who edits, how often, and what needs approval decide more than any feature list.',
         body: doc(p('Start with the people: who writes, who approves, and who fixes things when they break.'), p('Then the cadence, then the features.')),
         review: { status: 'approved', stagedBy: 'Sam Ortiz', requestedBy: 'Sam Ortiz', approvedBy: 'Jordan Blake', hours: 4 } }),
@@ -223,11 +227,23 @@
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
-      if (raw) { var d = JSON.parse(raw); if (d && d.version === 2 && Array.isArray(d.posts)) return d; }
+      if (raw) { var d = JSON.parse(raw); if (d && d.version === 2 && Array.isArray(d.posts)) return withMediaStates(d); }
     } catch (e) { /* corrupt or blocked: fall through to fresh sample data */ }
     var fresh = seed();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(fresh)); } catch (e) { /* storage blocked: run in memory */ }
     return fresh;
+  }
+  // Visitors from before 1.5.0 have no private or public state on their
+  // images: anything a live or scheduled post shows counts as public.
+  function withMediaStates(d) {
+    if (d.media15 || !Array.isArray(d.media)) return d;
+    d.media.forEach(function (m) {
+      var shown = d.posts.some(function (p) { var c = p.live || (p.status === 'scheduled' ? p.draft : null); return !!c && (c.cover === m.src || JSON.stringify(c.body || {}).indexOf(m.src) !== -1); });
+      if (shown && !m.promotedAt) m.promotedAt = m.createdAt;
+    });
+    d.media15 = true;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch (e) { /* storage blocked: run in memory */ }
+    return d;
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); return true; }
@@ -279,6 +295,7 @@
     db.posts.forEach(function (p) {
       if (p.status === 'scheduled' && p.publishAt && new Date(p.publishAt) <= new Date()) {
         p.status = 'published'; p.live = clone(p.draft); p.publishedAt = p.publishAt; p.publishAt = null; changed = true;
+        promoteFor(p.live, p);
         keepRevision(p, 'the scheduler');
         db.audit.unshift({ id: uid(), at: nowIso(), actor: 'scheduler', role: 'system', action: 'blog_post.scheduled_publish', resourceType: 'blog_post', resourceId: p.id, payload: { title: p.draft.title }, ip: '' });
       }
@@ -369,6 +386,7 @@
   function publishPost(p, how, batch) {
     var r = reviewOf(p), wasLive = p.status === 'published' && p.publishedAt;
     p.live = clone(p.draft); p.status = 'published'; p.publishAt = null; if (!wasLive) p.publishedAt = nowIso(); p.updatedAt = nowIso();
+    promoteFor(p.live, p);
     keepRevision(p, me().name);
     if (r) audit('blog_post.publish_staged', 'blog_post', p.id, { title: p.draft.title, slug: p.draft.slug, review_status: r.status, approved_by: r.approvedBy, batch: batch || 1 });
     else audit(how || 'blog_post.publish', 'blog_post', p.id, { title: p.draft.title });
@@ -484,7 +502,7 @@
   var NAV = [
     { title: 'Content', items: [
       { id: 'posts', label: 'Posts', icon: 'posts' },
-      { id: 'media', label: 'Media', icon: 'image', proposed: true },
+      { id: 'media', label: 'Media', icon: 'image' },
       { id: 'staging', label: 'Staging', icon: 'globe', badge: function () { return stagedChanges().length; } }
     ] },
     { title: 'Site', items: [{ id: 'redirects', label: 'Redirects', icon: 'redirect' }] },
@@ -1006,9 +1024,12 @@
       else if (c === 'redo') ch.redo().run();
       else if (c === 'link') linkDialog(editor);
       else if (c === 'image') pickMedia(function (m) {
-        // As in the kit's PostEditor: an image with no alt text asks for it on the way in.
-        if (m.alt) { editor.chain().focus().setImage({ src: m.src, alt: m.alt }).run(); return; }
-        altDialog('', function (alt) { editor.chain().focus().setImage({ src: m.src, alt: alt }).run(); });
+        // As in the kit's PostEditor (1.5.0): the image is reused as is, and
+        // the alt text kept for it is offered; the first one given is kept.
+        altDialog(m.alt || '', function (alt) {
+          editor.chain().focus().setImage({ src: m.src, alt: alt }).run();
+          if (alt && !m.alt) { m.alt = alt; save(); }
+        });
       });
       else if (c === 'alt') altDialog(editor.getAttributes('image').alt || '', function (alt) { editor.chain().focus().updateAttributes('image', { alt: alt }).run(); });
     });
@@ -1271,6 +1292,8 @@
         var v = $('#when', f).value; var at = v ? new Date(v) : null;
         if (!at || isNaN(at.getTime()) || at <= new Date()) { $('#when-err', f).textContent = 'Pick a time in the future.'; return; }
         p.status = 'scheduled'; p.publishAt = at.toISOString(); p.updatedAt = nowIso();
+        // As in the kit by default: a scheduled post's images go public now (SCHEDULED_IMAGES=at_publish waits for the date).
+        promoteFor(p.draft, p);
         audit('blog_post.schedule', 'blog_post', p.id, { publish_at: p.publishAt }); save();
         close(); toast('Scheduled for ' + dateTimeLabel(p.publishAt) + '.'); after();
       }
@@ -1425,46 +1448,92 @@
   }
 
   // -------------------------------------------------------------- media
+  // 1.5.0 media library: the same rules as the kit's lib/media/library.ts
+  // and migration 004. An image is private until a post using it goes live
+  // (then the promotion ledger records it as public), every place that uses it
+  // is listed, and a used image cannot be deleted.
+  function contentUses(c, src) {
+    return !!c && (c.cover === src || JSON.stringify(c.body || {}).indexOf(src) !== -1);
+  }
+  function mediaUses(m) {
+    var uses = [];
+    db.posts.forEach(function (p) {
+      if (p.live && contentUses(p.live, m.src)) uses.push({ kind: 'post', post: p });
+      if (contentUses(p.draft, m.src) && (!p.live || !same(p.live, p.draft))) uses.push({ kind: p.live ? 'staged' : 'post', post: p });
+      else if ((p.revisions || []).some(function (r) { return contentUses(r.content, m.src); }) && !uses.some(function (u) { return u.post === p; })) uses.push({ kind: 'revision', post: p });
+    });
+    return uses;
+  }
+  function deleteRefusal(uses) {
+    if (!uses.length) return '';
+    var n = function (k) { return uses.filter(function (u) { return u.kind === k; }).length; };
+    var parts = [];
+    if (n('post')) parts.push(plural(n('post'), 'post', 'posts'));
+    if (n('staged')) parts.push(plural(n('staged'), 'staged change', 'staged changes'));
+    if (n('revision')) parts.push(plural(n('revision'), "post's kept revisions", "posts' kept revisions"));
+    return 'In use by ' + parts.join(', ') + '. Remove it from them first; a used image is never deleted.';
+  }
+  // Publishing copies a post's images to the public bucket and records each
+  // in the ledger (the kit's lib/staging/promote-images.ts).
+  function promoteFor(c, p) {
+    var n = 0;
+    db.media.forEach(function (m) {
+      if (!m.promotedAt && contentUses(c, m.src)) { m.promotedAt = nowIso(); m.promotedFor = p.id; n++; }
+    });
+    return n;
+  }
+  var USE_LABEL = { post: 'Post', staged: 'Staged change', revision: 'Kept revision' };
+  var mediaFilter = 'all';
   function viewMedia() {
     setTitle('Media');
     shell('media',
-      head('Media', 'Images for posts. JPEG, PNG, WebP or GIF, up to 5 MB each.', '<label class="btn btn-primary" for="file-in">' + icon('upload') + 'Upload images</label>') +
-      proposedNote('In the kit today images are uploaded from the post form, one at a time, and there is no library page.') +
-      '<input type="file" id="file-in" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="sr-only">' +
-      '<div class="drop" id="drop">Drop images here, or use <strong>Upload images</strong>. Files stay in this browser.</div>' +
+      head('Media', '<span class="tag-new">New in 1.5.0</span> Every image the site holds. New uploads stay private until a post using them goes live; pick one in the editor to use it again without a second upload. JPEG, PNG, WebP or GIF, up to 5 MB.', '<label class="btn btn-primary" for="file-in">' + icon('upload') + 'Upload image</label>') +
+      '<input type="file" id="file-in" accept="image/jpeg,image/png,image/webp,image/gif" class="sr-only">' +
+      '<div class="filters" role="search"><label class="sr-only" for="mfilter">Show</label><select class="input" id="mfilter">' +
+        opts([['all', 'All images'], ['private', 'Private'], ['public', 'Public'], ['unused', 'Unused'], ['missing_alt', 'Missing alt text']], mediaFilter) + '</select></div>' +
       '<p class="count-line" id="mcount" aria-live="polite"></p>' +
       '<div class="media-grid" id="mgrid"></div>'
     );
     function draw() {
-      $('#mcount').textContent = plural(db.media.length, 'image', 'images');
-      $('#mgrid').innerHTML = db.media.length ? db.media.map(function (m) {
-        var used = db.posts.filter(function (p) { return p.draft.cover === m.src || JSON.stringify(p.draft.body).indexOf(m.src.slice(0, 120)) !== -1; }).length;
+      var rows = db.media.map(function (m) { return { m: m, uses: mediaUses(m) }; }).filter(function (r) {
+        if (mediaFilter === 'private') return !r.m.promotedAt;
+        if (mediaFilter === 'public') return !!r.m.promotedAt;
+        if (mediaFilter === 'unused') return !r.uses.length;
+        if (mediaFilter === 'missing_alt') return !String(r.m.alt || '').trim();
+        return true;
+      });
+      $('#mcount').textContent = plural(rows.length, 'image', 'images') + (mediaFilter === 'all' ? '' : ' (filtered)');
+      $('#mgrid').innerHTML = rows.length ? rows.map(function (r) {
+        var m = r.m, refusal = deleteRefusal(r.uses);
+        var state = m.promotedAt ? chip('published', 'Public') : chip('scheduled', 'Private');
+        var usedBy = r.uses.length ? '<ul class="uses">' + r.uses.map(function (u) { return '<li>' + esc(USE_LABEL[u.kind]) + ': <a href="#/posts/' + esc(u.post.id) + '">' + esc(u.post.draft.title || 'Untitled') + '</a></li>'; }).join('') + '</ul>' : '<span class="muted">Not used yet</span>';
         return '<figure class="media-item">' +
           '<img src="' + esc(m.src) + '" alt="' + esc(m.alt) + '" loading="lazy">' +
-          '<figcaption class="media-meta"><span class="nm" title="' + esc(m.name) + '">' + esc(m.name) + '</span><span class="muted">' + esc(m.w + ' x ' + m.h + ', ' + Math.max(1, Math.round(m.size / 1024)) + ' KB') + '</span><span class="muted">' + (m.alt ? 'Alt: ' + esc(m.alt) : '<span class="hint err">No alt text</span>') + '</span><span class="muted">' + esc(used ? 'Used in ' + plural(used, 'post', 'posts') : 'Not used yet') + '</span></figcaption>' +
-          '<div class="media-actions"><button type="button" class="btn btn-ghost btn-sm" data-act="alt" data-id="' + esc(m.id) + '" aria-label="Edit alt text for ' + esc(m.name) + '">' + icon('edit') + 'Alt text</button><span class="grow"></span><button type="button" class="icon-btn danger" data-act="del-media" data-id="' + esc(m.id) + '" aria-label="Delete ' + esc(m.name) + '">' + icon('trash') + '</button></div>' +
+          '<figcaption class="media-meta"><span>' + state + '</span><span class="nm" title="' + esc(m.name) + '">' + esc(m.name) + '</span><span class="muted">' + esc(m.w + ' x ' + m.h + ', ' + Math.max(1, Math.round(m.size / 1024)) + ' KB') + '</span>' +
+            (m.promotedAt ? '<span class="muted">Made public ' + esc(dateTimeLabel(m.promotedAt)) + '</span>' : '<span class="muted">Private until a post using it goes live</span>') +
+            '<span class="muted">' + (m.alt ? 'Alt: ' + esc(m.alt) : '<span class="hint err">No alt text</span>') + '</span>' +
+            '<span class="muted"><strong>Used by</strong></span>' + usedBy +
+            (refusal ? '<span class="hint">' + esc(refusal) + '</span>' : '') + '</figcaption>' +
+          '<div class="media-actions"><button type="button" class="btn btn-ghost btn-sm" data-act="alt" data-id="' + esc(m.id) + '" aria-label="Edit alt text for ' + esc(m.name) + '">' + icon('edit') + 'Alt text</button><span class="grow"></span><button type="button" class="icon-btn danger" data-act="del-media" data-id="' + esc(m.id) + '" aria-label="' + esc(refusal ? 'Cannot delete ' + m.name + ': it is in use' : 'Delete ' + m.name) + '"' + (refusal ? ' disabled' : '') + '>' + icon('trash') + '</button></div>' +
         '</figure>';
-      }).join('') : '<p class="empty">No images yet. Upload one to get started.</p>';
+      }).join('') : '<p class="empty">' + (db.media.length ? 'No images match this filter.' : 'No images yet. Upload one to get started.') + '</p>';
     }
     draw();
+    $('#mfilter').addEventListener('change', function (e) { mediaFilter = e.target.value; draw(); });
     $('#file-in').addEventListener('change', function (e) { handleFiles(e.target.files, draw); e.target.value = ''; });
-    var drop = $('#drop');
-    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
-    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
-    drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer.files, draw); });
     $('#mgrid').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]'); if (!b) return;
+      var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
       var m = db.media.filter(function (x) { return x.id === b.getAttribute('data-id'); })[0]; if (!m) return;
       if (b.getAttribute('data-act') === 'alt') {
-        openModal({ title: 'Alt text', desc: 'Describe what the image shows for people using screen readers. Leave empty only for decorative images.',
+        openModal({ title: 'Alt text', desc: 'Kept with the image and offered the next time it is picked for a post. Each post keeps its own copy, so a change here never rewrites a live post.',
           body: '<div class="field"><label class="lbl" for="alt-in">Alt text for ' + esc(m.name) + '</label><input class="input" id="alt-in" maxlength="200" value="' + esc(m.alt) + '" autofocus></div>',
           actions: '<button type="button" class="btn btn-outline" data-close>Cancel</button><button type="submit" class="btn btn-primary">Save</button>',
-          onSubmit: function (f, close) { m.alt = $('#alt-in', f).value.trim(); audit('media.update', 'media', m.id, { name: m.name }); save(); close(); toast('Alt text saved.'); draw(); } });
+          onSubmit: function (f, close) { m.alt = $('#alt-in', f).value.trim(); audit('media.alt_update', 'media', m.id, { name: m.name }); save(); close(); toast('Alt text saved.'); draw(); } });
       } else {
-        var used = db.posts.filter(function (p) { return p.draft.cover === m.src; }).length;
-        confirmDialog({ title: 'Delete this image?', desc: '<strong>' + esc(m.name) + '</strong>' + (used ? ' is the featured image of ' + plural(used, 'post', 'posts') + '; those posts will have none.' : ' is not used as a featured image.'), confirm: 'Delete image', danger: true, onConfirm: function () {
+        var refusal = deleteRefusal(mediaUses(m));
+        if (refusal) { toast(refusal, 'err'); return; }
+        confirmDialog({ title: 'Delete this image?', desc: '<strong>' + esc(m.name) + '</strong> is not used anywhere. It is removed from storage; this cannot be undone.', confirm: 'Delete image', danger: true, onConfirm: function () {
           db.media = db.media.filter(function (x) { return x.id !== m.id; });
-          db.posts.forEach(function (p) { if (p.draft.cover === m.src) p.draft.cover = ''; });
           audit('media.delete', 'media', m.id, { name: m.name }); save(); toast('Image deleted.'); draw();
         } });
       }
@@ -1493,8 +1562,7 @@
           var m = { id: uid(), name: name, type: f.type, size: Math.round(dataUrl.length * 0.75), w: w, h: hgt, alt: '', src: dataUrl, createdAt: nowIso() };
           db.media.unshift(m);
           if (!save()) { db.media.shift(); return; }
-          audit('media.upload', 'media', m.id, { name: name, original_name: f.name.slice(0, 80) });
-          save(); toast('Uploaded ' + f.name + '. Add alt text next.'); after(m);
+          save(); toast('Uploaded ' + f.name + '. It stays private until a post using it goes live.'); after(m);
         };
         if (src) finish(src);
         else { var r = new FileReader(); r.onload = function () { finish(String(r.result)); }; r.readAsDataURL(f); }
@@ -1506,11 +1574,11 @@
   function pickMedia(onPick) {
     openModal({
       title: 'Choose an image', wide: true,
-      body: '<p class="desc">Pick from the media library or upload a new image.</p><label class="btn btn-outline btn-sm" for="pick-up">' + icon('upload') + 'Upload</label><input type="file" id="pick-up" class="sr-only" accept="image/jpeg,image/png,image/webp,image/gif"><div class="pick-grid mt-12" id="pick-grid"></div>',
+      body: '<p class="desc">Pick an image from the media library to use it again (no second upload; the alt text kept for it is offered), or upload a new one.</p><label class="btn btn-outline btn-sm" for="pick-up">' + icon('upload') + 'Upload</label><input type="file" id="pick-up" class="sr-only" accept="image/jpeg,image/png,image/webp,image/gif"><div class="pick-grid mt-12" id="pick-grid"></div>',
       onOpen: function (m, close) {
         var grid = $('#pick-grid', m);
         function draw() {
-          grid.innerHTML = db.media.map(function (x) { return '<button type="button" class="pick" data-id="' + esc(x.id) + '" aria-label="Use ' + esc(x.alt || x.name) + '"><img src="' + esc(x.src) + '" alt=""></button>'; }).join('') || '<p class="muted">No images yet.</p>';
+          grid.innerHTML = db.media.map(function (x) { return '<button type="button" class="pick" data-id="' + esc(x.id) + '" aria-label="Use ' + esc(x.alt || x.name) + '" title="' + esc(x.alt || 'No alt text yet') + (x.promotedAt ? '' : ' (private until its post goes live)') + '"><img src="' + esc(x.src) + '" alt=""></button>'; }).join('') || '<p class="muted">No images yet.</p>';
         }
         draw();
         grid.addEventListener('click', function (e) { var b = e.target.closest('.pick'); if (!b) return; var x = db.media.filter(function (y) { return y.id === b.getAttribute('data-id'); })[0]; close(); onPick(x); });
@@ -1755,6 +1823,9 @@
           'New in 1.4.0: password re-checks and recovery codes are limited per admin, and each failed try is in the audit log.',
           'New in 1.4.0: images go public only after their post is published, through a ledger that refuses a public file the kit did not put there.',
           'New in 1.4.0: a scheduler in the database (Supabase Cron) publishes scheduled posts and takes posts down at their end date, every minute.',
+          'New in 1.5.0: the database refuses to delete an image that a post, a staged change, a kept revision or a testimonial still uses, in both image buckets.',
+          'New in 1.5.0: testimonial pictures go public when the testimonial is saved, through the same ledger (before, they stayed private), and the staged-image cleanup keeps them.',
+          'New in 1.5.0, optional: with SCHEDULED_IMAGES=at_publish, the images of a scheduled post stay private until its date, copied by a server job that Supabase Cron calls every minute.',
           'The redirect counter is limited per visitor and per redirect, so nobody can inflate it.',
           'The audit log is append-only: the database refuses edits and deletes, apart from clearing entries older than the retention window (24 months by default).',
           'Images uploaded for a post stay private until the post goes live.',

@@ -328,8 +328,9 @@ export default function PostForm({ initialData, staged = null, children }: PostF
   async function handleMakeImagesPublic() {
     if (!initialData?.id) return
     const result = await promotePostImages(initialData.id)
-    if (result.ok) setImageWarning(null)
-    else alert(result.error)
+    if (!result.ok) alert(result.error)
+    else if (result.data?.waitsForDate) alert('This post is scheduled: its images go public at its date, copied by the scheduled-publishing job.')
+    else setImageWarning(null)
   }
 
   function handleAIGenerated(data: {

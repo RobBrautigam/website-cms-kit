@@ -16,11 +16,21 @@ function bucket(name) {
       return { data: { path: to }, error: null }
     },
     async remove(paths) {
-      for (const p of paths) files().delete(p)
-      return { data: paths.map((name) => ({ name })), error: null }
+      calls.order.push(`remove ${name} ${paths.join(',')}`)
+      // A storage policy that refuses answers with an empty list, not an error.
+      if (fakes.storage.refuseRemove.includes(name)) return { data: [], error: null }
+      const gone = paths.filter((p) => files().has(p))
+      for (const p of gone) files().delete(p)
+      return { data: gone.map((name) => ({ name })), error: null }
+    },
+    async exists(path) {
+      return { data: files().has(path), error: null }
     },
     async list() {
       return { data: [...files()].map((p) => ({ name: p.replace(/^blog\//, ''), created_at: '2026-01-01T00:00:00Z' })), error: null }
+    },
+    getPublicUrl(path) {
+      return { data: { publicUrl: `https://proj.supabase.example/storage/v1/object/public/${name}/${path}` } }
     },
   }
 }
@@ -36,10 +46,15 @@ function table(name) {
   let op = 'select'
   let payload = null
   const filters = []
-  const matches = (r) => filters.every(([kind, col, v]) => (kind === 'in' ? v.includes(r[col]) : r[col] === v))
+  const matches = (r) =>
+    filters.every(([kind, col, v]) =>
+      kind === 'in' ? v.includes(r[col]) : kind === 'lte' ? r[col] != null && String(r[col]) <= String(v)
+        : kind === 'gte' ? r[col] != null && String(r[col]) >= String(v) : r[col] === v
+    )
   const run = async (single) => {
     calls.queries.push({ table: name, op, payload, filters: filters.map(([, c, v]) => [c, v]) })
     const one = (list) => (single ? (list[0] ?? null) : list)
+    if (op === 'select' && fakes.failSelect[name]) return { data: null, error: { message: fakes.failSelect[name] } }
     if (op === 'insert') {
       if (fakes.failInsert[name]) return { data: null, error: { message: fakes.failInsert[name] } }
       const added = []
@@ -53,6 +68,12 @@ function table(name) {
         added.push(row)
       }
       return { data: one(added), error: null }
+    }
+    // A teammate's write landing between a read and this update.
+    if (op === 'update' && fakes.beforeUpdate[name]) {
+      const change = fakes.beforeUpdate[name]
+      delete fakes.beforeUpdate[name]
+      change(rows)
     }
     const hit = rows.filter(matches)
     if (op === 'update') hit.forEach((r) => Object.assign(r, payload))
@@ -69,6 +90,8 @@ function table(name) {
     range() { return q },
     eq(col, v) { filters.push(['eq', col, v]); return q },
     in(col, v) { filters.push(['in', col, v]); return q },
+    lte(col, v) { filters.push(['lte', col, v]); return q },
+    gte(col, v) { filters.push(['gte', col, v]); return q },
     maybeSingle() { return run(true) },
     single() { return run(true) },
     then(resolve, reject) { return run(false).then(resolve, reject) },

@@ -48,6 +48,16 @@ export function imagePathsIn(content: { featured_image_url?: unknown; body?: unk
   return [...paths]
 }
 
+/** The kit image paths a testimonial holds (its pictures share the post buckets). */
+export function imagePathsInTestimonial(row: {
+  headshot_url?: unknown
+  screenshot_url?: unknown
+  video_thumbnail_url?: unknown
+}): string[] {
+  const paths = [row.headshot_url, row.screenshot_url, row.video_thumbnail_url].map(imagePathFromUrl)
+  return [...new Set(paths.filter((p): p is string => p !== null))]
+}
+
 /**
  * A copy of the content with image URLs swapped through `signed` (path to
  * signed URL). Used by the draft-mode preview; the stored content is never
