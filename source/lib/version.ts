@@ -3,4 +3,4 @@
  * version source (package.json, a build-time env var, a CI constant) however
  * you like. Kept as a constant here so the kit has no build-tooling dependency.
  */
-export const APP_VERSION = 'v1.3.0'
+export const APP_VERSION = 'v1.4.0'

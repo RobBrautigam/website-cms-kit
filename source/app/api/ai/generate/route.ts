@@ -26,7 +26,7 @@ const SYSTEM_PROMPT = `You are a helpful blog-writing assistant. Write clear, we
 - Use H2 and H3 headings (NEVER H1 inside the body)
 - Strong opening hook within the first paragraph
 - End with a clear takeaway or call to action
-- Weave SEO keywords naturally — never force them
+- Weave SEO keywords naturally - never force them
 
 ## Output Format
 You MUST return valid JSON with this exact structure:

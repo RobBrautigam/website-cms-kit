@@ -81,8 +81,8 @@ export default function InviteModal({
               onChange={(e) => setRole(e.target.value as 'admin' | 'super_admin')}
               className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition"
             >
-              <option value="admin">Admin — manage all CMS content</option>
-              <option value="super_admin">Super Admin — also manage team and roles</option>
+              <option value="admin">Admin - manage all CMS content</option>
+              <option value="super_admin">Super Admin - also manage team and roles</option>
             </select>
           </div>
 

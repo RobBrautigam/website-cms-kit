@@ -7,7 +7,7 @@ import { crossSiteRefusal } from '@/lib/security/request-origin'
 /**
  * POST /api/admin/users/[id]/reactivate
  *
- * Super-admin only. Inverse of /deactivate — lifts the auth.users ban
+ * Super-admin only. Inverse of /deactivate - lifts the auth.users ban
  * and clears user_roles.deactivated_at.
  */
 export async function POST(

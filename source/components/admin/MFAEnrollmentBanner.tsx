@@ -4,7 +4,7 @@ import { mustEnforceMFA, FEATURE_SHIP_DATE, GRACE_DAYS } from "@/lib/auth/mfa";
 /**
  * Soft prompt that appears at the top of every admin page during the MFA
  * grace window for users who haven't enrolled yet. After the grace window
- * elapses, this component returns null — at that point the login flow
+ * elapses, this component returns null - at that point the login flow
  * hard-redirects unenrolled users to /admin/security/enroll, so the banner
  * is no longer the right surface.
  *

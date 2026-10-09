@@ -2,7 +2,7 @@ import { requirePartialAdmin } from "@/lib/auth/require";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { crossSiteRefusal } from "@/lib/security/request-origin";
 
-// audit:exempt — initiates a TOTP challenge; the audit row is written by the verify endpoint
+// audit:exempt - initiates a TOTP challenge; the audit row is written by the verify endpoint
 export async function POST(request: Request) {
   const refused = crossSiteRefusal(request);
   if (refused) return refused;

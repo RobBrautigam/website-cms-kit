@@ -1,7 +1,7 @@
 /**
  * Password complexity check for admin password set/reset.
  *
- * Three categories — letter (any case) / number / symbol — plus a 12-char
+ * Three categories - letter (any case) / number / symbol - plus a 12-char
  * minimum. Aligned with NIST SP 800-63B updated guidance which favors
  * length over arcane composition rules. We don't distinguish lowercase vs
  * uppercase because requiring both adds friction without meaningfully

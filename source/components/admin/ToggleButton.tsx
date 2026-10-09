@@ -20,7 +20,7 @@ interface Props {
    *
    * IMPORTANT: when this component is rendered from a server component
    * (e.g., `src/app/(admin)/admin/jobs/page.tsx`), the `action` prop must be
-   * a server action — either the imported function directly, or a bound
+   * a server action - either the imported function directly, or a bound
    * version like `toggleJobActive.bind(null, job.id)`. Plain arrow closures
    * (`(next) => toggleJobActive(job.id, next)`) cannot cross the RSC→client
    * boundary and will throw "Functions cannot be passed directly to Client

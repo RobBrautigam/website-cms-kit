@@ -9,7 +9,7 @@ import { clientAddress } from "@/lib/security/rate-limit";
  * Called from <RedirectBeacon> on the destination page when an `app_r=<id>`
  * cookie is present (set by the proxy on the redirect response).
  *
- * Always returns 204 No Content — we don't want to leak whether a given
+ * Always returns 204 No Content - we don't want to leak whether a given
  * id maps to a real redirect, and the client-side beacon ignores the
  * response either way.
  *
@@ -46,7 +46,7 @@ export async function POST(
   try {
     await recordHit(id, clientAddress(request.headers));
   } catch {
-    // Silently swallow — telemetry is best-effort. The cookie is already
+    // Silently swallow - telemetry is best-effort. The cookie is already
     // gone by the time the beacon fires, so retry isn't possible anyway.
   }
 

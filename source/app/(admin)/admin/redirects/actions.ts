@@ -23,10 +23,13 @@ function parseFormToInput(formData: FormData) {
   };
 }
 
+const WAITS_FOR_TEAMMATE =
+  "Saved switched off: review is required, so a teammate switches on a redirect you created or changed.";
+
 export async function createRedirect(
-  _prev: ActionResult,
+  _prev: ActionResult<{ notice?: string }>,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notice?: string }>> {
   await requireAdmin();
   const supabase = await createServerSupabaseClient();
   const parsed = redirectInputSchema.safeParse(parseFormToInput(formData));
@@ -39,7 +42,7 @@ export async function createRedirect(
   const { data: inserted, error } = await supabase
     .from("url_redirects")
     .insert(parsed.data)
-    .select("id, source, destination, permanent")
+    .select("id, source, destination, permanent, enabled")
     .single();
   const wrapped = wrapSupabaseError(
     error,
@@ -58,14 +61,15 @@ export async function createRedirect(
     },
   });
   revalidatePath("/admin/redirects");
-  return ok();
+  // Under required review the database saves it switched off (migration 003).
+  return ok(parsed.data.enabled && !inserted.enabled ? { notice: WAITS_FOR_TEAMMATE } : {});
 }
 
 export async function updateRedirect(
   id: string,
-  _prev: ActionResult,
+  _prev: ActionResult<{ notice?: string }>,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<{ notice?: string }>> {
   await requireAdmin();
   const supabase = await createServerSupabaseClient();
   const parsed = redirectInputSchema.safeParse(parseFormToInput(formData));
@@ -79,7 +83,7 @@ export async function updateRedirect(
     .from("url_redirects")
     .update(parsed.data)
     .eq("id", id)
-    .select("id")
+    .select("id, enabled")
     .maybeSingle();
   const wrapped = wrapSupabaseError(
     error,
@@ -94,7 +98,8 @@ export async function updateRedirect(
     payload: { fields_changed: Object.keys(parsed.data) },
   });
   revalidatePath("/admin/redirects");
-  return ok();
+  // Under required review a changed rule is saved switched off (migration 003).
+  return ok(parsed.data.enabled && !data.enabled ? { notice: WAITS_FOR_TEAMMATE } : {});
 }
 
 export async function deleteRedirect(id: string): Promise<ActionResult> {

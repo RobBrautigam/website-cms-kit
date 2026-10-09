@@ -26,10 +26,10 @@ export default async function ResetPasswordPage({
     rawContext === 'invite' ? 'invite' : 'recovery'
 
   // Supabase magic-link can land here in two flow shapes:
-  //   1. PKCE: ?code=<pkce-code>   — exchange server-side, sets cookies
-  //   2. Implicit: #access_token=... in the URL hash — handled CLIENT-SIDE
+  //   1. PKCE: ?code=<pkce-code>   - exchange server-side, sets cookies
+  //   2. Implicit: #access_token=... in the URL hash - handled CLIENT-SIDE
   //      because hashes never reach the server. ResetPasswordForm parses it.
-  //   3. Error: ?error=...&error_description=... — link expired or invalid
+  //   3. Error: ?error=...&error_description=... - link expired or invalid
   let exchangeError: string | null = null
 
   if (params?.error) {

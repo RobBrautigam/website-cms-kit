@@ -218,7 +218,7 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
                   <StagedBadge status={post.staged} />
                 </td>
                 <td className="px-5 py-4 text-sm text-text-secondary whitespace-nowrap">
-                  {post.author_slug || '—'}
+                  {post.author_slug || '-'}
                 </td>
                 <td className="px-5 py-4">
                   <ToggleButton
@@ -238,7 +238,7 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
                     ? new Date(post.published_at).toLocaleDateString('en-US', {
                         month: 'short', day: 'numeric', year: 'numeric',
                       })
-                    : '—'}
+                    : '-'}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center justify-end gap-1">
@@ -290,12 +290,12 @@ export default function PostsTable({ posts }: { posts: PostRow[] }) {
       {/* Mobile card list */}
       <ul className="md:hidden space-y-3">
         {filteredPosts.map((post) => {
-          const author = post.author_slug || '—'
+          const author = post.author_slug || '-'
           const date = post.published_at
             ? new Date(post.published_at).toLocaleDateString('en-US', {
                 month: 'short', day: 'numeric', year: 'numeric',
               })
-            : '—'
+            : '-'
           return (
             <li key={post.id} className="border border-border rounded-lg bg-bg-white p-4">
               <div className="flex items-start gap-3">

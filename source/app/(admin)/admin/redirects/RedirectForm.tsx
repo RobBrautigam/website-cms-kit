@@ -8,16 +8,19 @@ import type { UrlRedirect } from "@/lib/redirects/types";
 import type { ActionResult } from "@/lib/admin/action-result";
 import SubmitButton from "@/components/admin/SubmitButton";
 
+/** A save may carry a notice (a redirect saved switched off for review). */
+type FormState = ActionResult<{ notice?: string }>;
+
 interface Props {
   mode: "create" | "edit";
   initial?: Partial<UrlRedirect>;
   categories: string[];
-  action: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
+  action: (prev: FormState, formData: FormData) => Promise<FormState>;
   /** Toast copy on success. */
   successCopy: string;
 }
 
-const INITIAL_STATE: ActionResult = { ok: true };
+const INITIAL_STATE: FormState = { ok: true };
 
 export default function RedirectForm({
   mode,
@@ -39,6 +42,8 @@ export default function RedirectForm({
     if (!submitted.current) return;
     if (state.ok) {
       toast.success(successCopy);
+      const notice = state.data?.notice;
+      if (notice) toast.warning(notice);
       router.push("/admin/redirects");
     } else {
       toast.error(state.error);
@@ -155,9 +160,9 @@ export default function RedirectForm({
       {mode === "edit" && initial && (
         <div className="rounded-md border border-border bg-bg-elevated/40 px-4 py-3 text-xs text-text-secondary space-y-1">
           <div>Hits: <span className="tabular-nums font-semibold">{initial.hit_count?.toLocaleString() ?? 0}</span></div>
-          <div>Last hit: {initial.last_access ?? "—"}</div>
-          <div>Created: {initial.created_at ?? "—"}</div>
-          <div>Updated: {initial.updated_at ?? "—"}</div>
+          <div>Last hit: {initial.last_access ?? "-"}</div>
+          <div>Created: {initial.created_at ?? "-"}</div>
+          <div>Updated: {initial.updated_at ?? "-"}</div>
         </div>
       )}
 

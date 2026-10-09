@@ -1,7 +1,7 @@
 /**
  * Neutral placeholder logo mark for the kit. Uses `currentColor` so it inherits
  * whatever text color you apply (e.g. `text-accent`). Swap this for your own
- * brand logo — the auth shell only depends on the `size` + `className` props.
+ * brand logo - the auth shell only depends on the `size` + `className` props.
  */
 export function LogoMark({
   size = 40,

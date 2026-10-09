@@ -1,7 +1,7 @@
 import { requirePartialAdmin } from "@/lib/auth/require";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-// audit:exempt — read-only listing of caller's own MFA factors
+// audit:exempt - read-only listing of caller's own MFA factors
 export async function GET() {
   await requirePartialAdmin();
   const supabase = await createServerSupabaseClient();

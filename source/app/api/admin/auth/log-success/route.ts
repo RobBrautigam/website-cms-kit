@@ -6,7 +6,7 @@ import { crossSiteRefusal } from "@/lib/security/request-origin";
  * Authenticated audit endpoint for successful admin logins. Called
  * fire-and-forget from the LoginForm client AFTER signInWithPassword
  * succeeds. The session cookie is already set at that point, so
- * requirePartialAdmin can verify the caller is a real, active admin —
+ * requirePartialAdmin can verify the caller is a real, active admin -
  * forged inputs from anonymous callers are rejected with the standard
  * unauthenticated redirect chain.
  *

@@ -42,7 +42,7 @@ export async function createServerSupabaseClient() {
  * Service-role client for server contexts that genuinely need to bypass RLS
  * (admin mutations, internal API routes acting on behalf of trusted callers).
  *
- * DO NOT use this for SSG / build-time data fetching of public data —
+ * DO NOT use this for SSG / build-time data fetching of public data -
  * exposing SUPABASE_SERVICE_ROLE_KEY to the CI build environment is a P1
  * security issue (a malicious PR could exfiltrate the key). Use
  * `createAnonServerClient()` instead and rely on the table's RLS policy
@@ -60,7 +60,7 @@ export function createServiceClient() {
  * Anon-key server client for SSG / build-time data fetching of public data.
  *
  * Uses the public anon key (already exposed in client-side JS bundles, so
- * safe in CI build env). Subject to RLS — caller must ensure target table
+ * safe in CI build env). Subject to RLS - caller must ensure target table
  * has an appropriate `TO anon ... USING (...)` policy. Examples:
  *   - blog_posts:  anon can read WHERE status = 'published'
  *   - job_openings: anon can read WHERE is_active = true

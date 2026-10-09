@@ -1,5 +1,5 @@
 -- ============================================================================
--- Website CMS Kit — consolidated schema
+-- Website CMS Kit - consolidated schema
 -- ============================================================================
 -- Run this once in your Supabase SQL editor (Dashboard -> SQL Editor) on a
 -- fresh project. It stands up the whole admin CMS: roles + RLS, the content
@@ -99,7 +99,7 @@ grant execute on function public.is_admin_or_above(uuid) to authenticated, servi
 
 -- user_roles policies: a user can read their own row; only super_admins read
 -- everyone's or write at all. (Most writes happen via the service-role client
--- in the /api/admin/users/* routes, which bypasses RLS — these policies are
+-- in the /api/admin/users/* routes, which bypasses RLS - these policies are
 -- the defense-in-depth backstop.)
 drop policy if exists "user_roles_self_or_super_admin_read" on public.user_roles;
 create policy "user_roles_self_or_super_admin_read"
@@ -395,7 +395,7 @@ grant execute on function public.increment_redirect_hit(uuid) to anon, authentic
 -- 7. admin_audit_log  (append-only forensic record)
 -- ----------------------------------------------------------------------------
 -- Writes flow through recordAdminAction() using the SERVICE-ROLE client, so
--- there are no INSERT/UPDATE/DELETE policies for authenticated users — only
+-- there are no INSERT/UPDATE/DELETE policies for authenticated users - only
 -- super_admins can read. Append-only by construction.
 create table if not exists public.admin_audit_log (
   id uuid primary key default gen_random_uuid(),
@@ -576,7 +576,7 @@ create policy "blog_images_require_mfa"
 --
 -- B. Seed your first super-admin. Create the auth user first (Dashboard ->
 --    Authentication -> Add user, OR invite them once a second super-admin
---    exists), then run — replacing the email:
+--    exists), then run - replacing the email:
 --
 --      insert into public.user_roles (user_id, role)
 --      select id, 'super_admin' from auth.users

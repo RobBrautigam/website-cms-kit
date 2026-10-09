@@ -274,16 +274,16 @@ export function AuditLogView({ initial, initialFilters, pageSize }: Props) {
                     <td className="px-3 py-3">
                       <div className="text-text-primary">{r.actor_email}</div>
                       <div className="text-xs text-text-muted">
-                        {r.actor_role ?? "—"}
+                        {r.actor_role ?? "-"}
                       </div>
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">{r.action}</td>
                     <td className="px-3 py-3 text-xs">
-                      {r.resource_type ?? "—"}
+                      {r.resource_type ?? "-"}
                       {r.resource_id ? ` · ${r.resource_id.slice(0, 8)}` : ""}
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">
-                      {r.ip_address ?? "—"}
+                      {r.ip_address ?? "-"}
                     </td>
                   </tr>
                   {isOpen && (
@@ -329,11 +329,11 @@ export function AuditLogView({ initial, initialFilters, pageSize }: Props) {
                 </span>
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                {r.actor_role ?? "—"} ·{" "}
+                {r.actor_role ?? "-"} ·{" "}
                 <span className="font-mono">{r.action}</span>
               </div>
               <div className="text-xs text-text-muted mt-1">
-                {r.resource_type ?? "—"}
+                {r.resource_type ?? "-"}
                 {r.resource_id ? ` · ${r.resource_id.slice(0, 8)}` : ""}
               </div>
               {isOpen && (

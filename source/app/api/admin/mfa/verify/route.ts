@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     // Claim the code atomically BEFORE the irreversible factor delete. This keeps
     // single-use honest: only one concurrent request can win, and we never report
     // success / audit a code we didn't actually mark used. A lost claim (race or
-    // DB error) means the code is not ours to spend — nothing was unenrolled.
+    // DB error) means the code is not ours to spend - nothing was unenrolled.
     const claimed = await consumeRecoveryCodeById(codeRowId);
     if (!claimed) {
       return Response.json({ error: "Invalid recovery code" }, { status: 400 });
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
     // Full success, OR a partial unenroll (some factors deleted before a later
     // delete failed): MFA state is mutated, so the recovery code is legitimately
-    // spent — do NOT release it. Record the spend, flagging partial failures so
+    // spent - do NOT release it. Record the spend, flagging partial failures so
     // operators can reconcile the user's MFA state, then drive them to re-enroll.
     await recordAdminAction({
       action: "auth.mfa.recovery_code_used",

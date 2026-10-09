@@ -10,7 +10,7 @@ const UUID_RE =
  * Reads the `app_r=<id>` cookie that the proxy attaches to internal-redirect
  * responses, deletes it, and POSTs to /api/redirects/hit/[id] for telemetry.
  *
- * Mount this once in the public site's root layout (it is OPTIONAL — only
+ * Mount this once in the public site's root layout (it is OPTIONAL - only
  * needed if you want per-hit counts on INTERNAL redirects; external redirects
  * are logged directly from the proxy). No-op when the cookie is absent.
  *
@@ -27,7 +27,7 @@ export function RedirectBeacon() {
     if (!entry) return;
 
     const value = entry.slice(prefix.length);
-    // Delete the cookie atomically before firing — protects against
+    // Delete the cookie atomically before firing - protects against
     // strict-mode double-mount and any reload race.
     document.cookie = `${REDIRECT_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
 

@@ -45,13 +45,13 @@ export async function deletePost(id: string): Promise<ActionResult> {
 /**
  * Sets the post status to `published` or `draft` based on the `next` flag.
  *
- * The `next` boolean is the desired post-toggle state — true means publish,
+ * The `next` boolean is the desired post-toggle state - true means publish,
  * false means draft. This matches the `<ToggleButton>` contract exactly so
  * the optimistic UI and the server mutation cannot diverge under concurrent
  * edits.
  *
  * Posts with the legacy `scheduled` status get treated like `draft` for
- * toggle purposes — clicking the badge on a scheduled post publishes it
+ * toggle purposes - clicking the badge on a scheduled post publishes it
  * immediately.
  */
 export async function togglePostStatus(

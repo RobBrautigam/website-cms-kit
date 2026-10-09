@@ -89,7 +89,7 @@ export interface RecordAdminActionInput {
 
 /**
  * Append a row to admin_audit_log. Best-effort: insert failures log to
- * console.error but never throw — losing an audit row is preferable to
+ * console.error but never throw - losing an audit row is preferable to
  * breaking a mutation.
  *
  * Extracts the client IP, preferring the edge-set `cf-connecting-ip` (Cloudflare

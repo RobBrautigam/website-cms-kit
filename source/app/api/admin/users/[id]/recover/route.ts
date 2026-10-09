@@ -8,7 +8,7 @@ import { crossSiteRefusal, siteOriginOf } from '@/lib/security/request-origin'
  * POST /api/admin/users/[id]/recover
  *
  * Super-admin only. Triggers a Supabase password recovery email for the
- * target user — useful when an admin forgets their password and needs a
+ * target user - useful when an admin forgets their password and needs a
  * super-admin to nudge them. Same magic-link flow as /admin/forgot-password.
  */
 export async function POST(
@@ -37,7 +37,7 @@ export async function POST(
   const origin = siteOriginOf(request)
 
   // IMPORTANT: use resetPasswordForEmail (NOT auth.admin.generateLink).
-  // generateLink only generates the link — it doesn't trigger the email send.
+  // generateLink only generates the link - it doesn't trigger the email send.
   // resetPasswordForEmail goes through Supabase's mailer and uses the
   // configured Recovery email template. The service-role client is allowed
   // to call it; it routes through the same /auth/v1/recover endpoint as the

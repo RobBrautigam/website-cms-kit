@@ -12,7 +12,7 @@ const Body = z.object({ role: z.enum(['super_admin', 'admin']) })
  * PATCH /api/admin/users/[id]/role
  *
  * Super-admin only. Changes another user's role. Refuses to demote the
- * only active super_admin (last-owner protection — GitHub pattern).
+ * only active super_admin (last-owner protection - GitHub pattern).
  */
 export async function PATCH(
   request: NextRequest,

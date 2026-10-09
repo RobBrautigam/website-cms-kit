@@ -48,7 +48,7 @@ const EXTERNAL_RE = /^https?:\/\//;
  * links, link previewers) that follow at most one redirect can reach the
  * underlying meeting URL.
  *
- * Pure function — no side effects. The proxy attaches the cookie to its
+ * Pure function - no side effects. The proxy attaches the cookie to its
  * NextResponse.
  */
 export function buildRedirectTarget(match: RedirectMatch): RedirectTarget {

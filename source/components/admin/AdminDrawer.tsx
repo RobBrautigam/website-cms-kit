@@ -44,7 +44,7 @@ export default function AdminDrawer({
 
   if (!mounted) return null
 
-  // Animate only the properties that actually change — backdrop fades, panel
+  // Animate only the properties that actually change - backdrop fades, panel
   // slides. Avoids unintended transitions on theme/border changes that
   // `transition-all` would catch, and is compositor-only (cheaper).
   const backdropTransition = reducedMotion ? 'transition-none' : 'transition-opacity duration-200 ease-out'
@@ -61,11 +61,11 @@ export default function AdminDrawer({
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       />
-      {/* Drawer panel — drop role="dialog" when closed so screen readers don't
+      {/* Drawer panel - drop role="dialog" when closed so screen readers don't
           announce a hidden dialog (an aria-hidden dialog is a known anti-pattern).
           `inert` removes the panel + descendants from the keyboard tab order
           AND the screen-reader tree when closed, which `aria-hidden` alone does
-          not (aria-hidden hides from AT only — focusable children stay tabbable).
+          not (aria-hidden hides from AT only - focusable children stay tabbable).
           The id targets the AdminShell hamburger's `aria-controls`. */}
       <div
         id="admin-drawer"

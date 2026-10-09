@@ -23,7 +23,7 @@ export const GRACE_DAYS = 7;
  * visually ambiguous characters (0/O, 1/l/i) so codes can be read aloud
  * over the phone if needed.
  *
- * Uses Node's crypto.randomInt (CSPRNG-backed) — recovery codes are a
+ * Uses Node's crypto.randomInt (CSPRNG-backed) - recovery codes are a
  * credential and Math.random is not cryptographically secure.
  */
 export function generateRecoveryCodes(): string[] {
@@ -84,7 +84,7 @@ export async function regenerateRecoveryCodes(
  * Returns the row id on match, null on no match / no codes / query error.
  *
  * Used by the verify route so the code can be consumed only AFTER a successful
- * factor unenroll (see consumeRecoveryCodeById + unenrollAllFactors) — that
+ * factor unenroll (see consumeRecoveryCodeById + unenrollAllFactors) - that
  * ordering is what stops a transient admin-API error from burning a single-use
  * code.
  *
@@ -133,7 +133,7 @@ export async function consumeRecoveryCodeById(id: string): Promise<boolean> {
 /**
  * Release a previously-claimed recovery code (set used_at back to null). Used by
  * the recovery login path to un-burn a code that was claimed up front but whose
- * factor unenroll then failed — so a transient admin-API error never costs the
+ * factor unenroll then failed - so a transient admin-API error never costs the
  * user a single-use code. Safe to call only on a row this request just claimed
  * (the atomic consume guarantees a single winner, so no other request owns it).
  */
@@ -168,8 +168,8 @@ export async function verifyAndConsumeRecoveryCode(
  * Attempts every factor (does NOT bail on the first delete error) so a stuck
  * factor doesn't leave the rest behind, and returns the TRUE count deleted.
  * `ok` is true only when nothing errored. The caller uses `deleted` to tell a
- * clean pre-mutation failure (`!ok && deleted === 0` — safe to retry, leave the
- * recovery code unspent) apart from a partial failure (`!ok && deleted > 0` —
+ * clean pre-mutation failure (`!ok && deleted === 0` - safe to retry, leave the
+ * recovery code unspent) apart from a partial failure (`!ok && deleted > 0` -
  * MFA state already changed, so the code is legitimately spent).
  */
 export async function unenrollAllFactors(
