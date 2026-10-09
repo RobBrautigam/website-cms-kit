@@ -15,7 +15,7 @@ Hardening and everyday comforts. Run `002_hardening.sql` after 001. Full detail 
 - **Per-caller limits** kept in the database: the AI routes share 20 calls per admin in 10 minutes and refuse when the limiter is down; the redirect counter is counted by the server only, per visitor and per redirect, and the public key can no longer call `increment_redirect_hit`.
 - **Schemas on the AI routes' output** (zod): a reply that does not fit, including a post body with a node the site does not draw or a link or image address that could run script, is a 502, never handed to the editor. Inputs are validated too, and errors no longer echo internal details.
 - **The audit log is append-only by trigger**: updates, deletes and truncates are refused for every role, the service role included, apart from the retention cleanup and the user-deletion foreign key.
-- **The opt-in two-person lock.** With mandatory review switched on, a trigger on `blog_posts` refuses any change that puts content on the public site unless it is exactly an approved staged change, through the screens or the Data API alike.
+- **The opt-in two-person lock.** With mandatory review switched on, a trigger on `blog_posts` refuses any change that puts a post's content or status on the public site unless it is exactly an approved staged change, through the screens or the Data API alike. Images, redirects and the other tables are outside it.
 - **Staged images stay private until publish.** Uploads go to a private `blog-images-staged` bucket; the admin and the preview show them through short-lived signed links, and every way a post goes live copies its images to the public bucket first.
 - **Slug swaps publish in one batch**: the unique slug is deferrable, and `publish_staged_posts()` checks it at the end of the batch.
 - **StarterKit's undrawn marks are drawn.** The public renderer now draws strike, inline code, code blocks and divider lines; a test keeps the editor and the renderer on one list of nodes and marks.
@@ -27,7 +27,7 @@ Hardening and everyday comforts. Run `002_hardening.sql` after 001. Full detail 
 - **A dark theme in the admin**: light, dark or system from the sidebar, kept in a cookie so the page never flashes.
 - **Bulk actions on the posts list**: publish, unpublish or delete several posts, each one applied or skipped with its reason.
 - **Search and share-card preview** for every post, with warnings for a long title or a missing description or image.
-- `docs/11-hardening-and-everyday-comforts.md`, and 79 more tests than 1.2.0 (130 in all, up from 51): migration 002 on PGlite, the route handlers against stand-ins for Next.js and Supabase, and the new helpers. Each was seen failing first; then each guard was broken on purpose (29 times in the migration, 25 in the code) to confirm a test catches it.
+- `docs/11-hardening-and-everyday-comforts.md`, and 82 more tests than 1.2.0 (133 in all, up from 51): migration 002 on PGlite, the route handlers against stand-ins for Next.js and Supabase, and the new helpers. Each was seen failing first; then each guard was broken on purpose (29 times in the migration, 25 in the code) to confirm a test catches it.
 - **Demo**: everything above that runs in a browser is live in the demo; the server-side hardening is described on the Settings page.
 
 ### Changed

@@ -8,7 +8,7 @@ What 1.3.0 added: migration `002_hardening.sql`, security headers and a Content 
 2. `001_staging_and_approval.sql`
 3. `002_hardening.sql`
 
-All three are idempotent. 002 replaces `publish_staged_posts()` from 001, so if you ever re-run 001, run 002 again after it. The database tests load all three (`npm test` in `source/supabase/tests`).
+All three are idempotent. 002 replaces `publish_staged_posts()` from 001 and tightens two things 000 sets up (who may call `increment_redirect_hit()`, and the two-factor rule on image uploads), so if you ever re-run 000 or 001, run 002 again after it. The database tests load all three (`npm test` in `source/supabase/tests`).
 
 ## Security headers and the Content Security Policy
 
@@ -77,14 +77,14 @@ Tests: `hardening.test.mjs`.
 
 ## The opt-in two-person lock
 
-Migration section 17, `blog_posts_two_person_lock()`, behind the same switch as mandatory review (`public.staging_review_required()`, off by default). With it on, a signed-in admin, through the cookie session or the Data API alike, can no longer change what the public site shows except by publishing a change a second admin approved:
+Migration section 17, `blog_posts_two_person_lock()`, behind the same switch as mandatory review (`public.staging_review_required()`, off by default). With it on, a signed-in admin, through the cookie session or the Data API alike, can no longer change a post's content or status on the public site except by publishing a change a second admin approved:
 
 - a new post starts as a draft;
 - a draft's content can be edited freely (it is not on the site);
 - a live or scheduled post can be taken down (back to draft) or deleted;
 - any other change to a live or scheduled post, and any change that makes a post live or scheduled, must carry exactly the content of an approved staged change for that post. `publish_staged_posts()` is the normal way.
 
-The service role and the table owner are not affected (server jobs, migrations). Set `REVIEW_REQUIRED` in `lib/staging/rules.ts` to match, so the screens send every go-live through staging.
+The lock covers `blog_posts` only. Image files, `url_redirects`, testimonials, jobs and the other tables stay under ordinary admin rights, so an admin can still replace an image's bytes or point a redirect elsewhere alone; a team that needs those under two-person control must lock them too. The service role and the table owner are not affected (server jobs, migrations). Set `REVIEW_REQUIRED` in `lib/staging/rules.ts` to match, so the screens send every go-live through staging.
 
 Tests: `hardening.test.mjs` (each path as an admin, the switch off and on).
 
@@ -112,7 +112,7 @@ StarterKit enables marks and nodes the public renderer did not draw. 1.3.0 draws
 
 ## Everyday comforts
 
-- **Unsaved changes and server autosave** (`components/admin/PostForm.tsx`, `lib/admin/autosave.ts`). A few seconds after you stop typing, a draft saves to its own row and a live post's edits save to its staged copy (paused while that copy is in review or approved, so autosave never resets a review). A new post saves in the browser until its first save. The status line says which, and leaving with unsaved changes asks first.
+- **Unsaved changes and server autosave** (`components/admin/PostForm.tsx`, `lib/admin/autosave.ts`). A few seconds after you stop typing, a draft saves to its own row, and a live post (or any post with a staged copy) saves to its staged copy (paused while that copy is in review or approved, so autosave never resets a review). A scheduled post is never autosaved, since it goes live on its own at its date: its edits wait for Update. A new post saves in the browser until its first save. The status line says which, and leaving with unsaved changes asks first.
 - **Required alt text** (`lib/admin/alt-text.ts`). Inserting an image asks for alt text, an Alt text button edits it, and the featured image has a required field. Drafts save without it; publishing, scheduling and staging do not, and the server actions run the same check.
 - **Dark theme in the admin** (`components/ThemeProvider.tsx`, `lib/admin/theme.ts`). Light, dark or system, from the sidebar; the choice is kept in a cookie so the server renders the right theme and the page never flashes.
 - **Bulk actions on the posts list** (`components/admin/PostsTable.tsx`, `lib/admin/bulk.ts`). Pick posts, then publish, unpublish or delete them. Each post is applied or skipped with its reason (already live, images without alt text, a staged change waiting, review required), and the server re-reads and re-plans rather than trusting the browser's list. Up to 100 at a time.

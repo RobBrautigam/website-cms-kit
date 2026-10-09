@@ -3,27 +3,32 @@
  *
  * Where an autosave goes depends on the post, so it never changes what the
  * public sees:
- *   - a draft (or scheduled) post: its own row, content fields only, never
- *     its status;
- *   - a live post: its staged copy (docs/10), never the live row; a change
- *     already sent for review is left alone, since autosaving into it would
- *     change what the reviewer is approving;
+ *   - a post with a staged copy, live or not: the staged copy (docs/10),
+ *     since that is what the editor opened and what will be published; a
+ *     change already sent for review is left alone, since autosaving into it
+ *     would change what the reviewer is approving;
+ *   - a live post: its staged copy, never the live row;
+ *   - a scheduled post: nowhere; it goes live on its own at its date, so
+ *     half-typed text waits for Update;
+ *   - a draft: its own row, content fields only, never its status;
  *   - a new post: this browser only, until the first save creates the row.
  */
 
 export const AUTOSAVE_DELAY_MS = 4000
 
-export type AutosaveTarget = 'draft' | 'staged' | 'browser' | 'paused'
+export type AutosaveTarget = 'draft' | 'staged' | 'browser' | 'paused' | 'off'
 
 export function autosaveTarget(opts: {
   postId?: string | null
   isLive: boolean
+  isScheduled?: boolean
   stagedReviewStatus?: 'staged' | 'in_review' | 'approved' | null
 }): AutosaveTarget {
   if (!opts.postId) return 'browser'
-  if (!opts.isLive) return 'draft'
   if (opts.stagedReviewStatus === 'in_review' || opts.stagedReviewStatus === 'approved') return 'paused'
-  return 'staged'
+  if (opts.stagedReviewStatus === 'staged' || opts.isLive) return 'staged'
+  if (opts.isScheduled) return 'off'
+  return 'draft'
 }
 
 /** A stable fingerprint of the content, independent of key order. */
@@ -57,6 +62,7 @@ export function autosaveLabel(state: {
   if (state.error) return `Not saved: ${state.error}`
   if (state.target === 'browser') return state.dirty ? 'Unsaved (kept in this browser)' : 'New post'
   if (state.target === 'paused') return state.dirty ? 'Unsaved: autosave is paused while this change is in review' : 'In review'
+  if (state.target === 'off') return state.dirty ? 'Unsaved changes: a scheduled post saves when you press Update' : 'Scheduled'
   if (state.dirty) return 'Unsaved changes'
   if (!state.savedAt) return 'All changes saved'
   const time = state.savedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })

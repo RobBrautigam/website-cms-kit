@@ -35,8 +35,8 @@ export const MetaSuggestion = z.object({
 // the topic or keywords). Links may point at https, http, mail, phone, a site
 // path or an anchor; images must be https or a site path. The renderer has
 // its own allowlist; this one keeps such output out of the editor too.
-const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?!\/)|#)/i
-const SAFE_SRC = /^(?:https:\/\/|\/(?!\/))/i
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|tel:|\/(?![/\\])|#)/i
+const SAFE_SRC = /^(?:https:\/\/|\/(?![/\\]))/i
 const urlAttr = (attrs: Record<string, unknown> | undefined, key: string, pattern: RegExp) =>
   typeof attrs?.[key] === 'string' && pattern.test(attrs[key] as string)
 

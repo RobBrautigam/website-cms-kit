@@ -88,7 +88,12 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
   // Unsaved changes and server autosave (lib/admin/autosave.ts): a draft
   // saves to its own row, a live post to its staged copy, a new post stays in
   // this browser until the first save.
-  const target = autosaveTarget({ postId: initialData?.id, isLive, stagedReviewStatus: staged?.reviewStatus ?? null })
+  const target = autosaveTarget({
+    postId: initialData?.id,
+    isLive,
+    isScheduled: initialData?.status === 'scheduled',
+    stagedReviewStatus: staged?.reviewStatus ?? null,
+  })
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshot(contentOf(meta, body)))
   const [autosaving, setAutosaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)

@@ -57,6 +57,18 @@ test('autosave goes to the draft row, the staged copy of a live post, or this br
   assert.ok(AUTOSAVE_DELAY_MS >= 1000 && AUTOSAVE_DELAY_MS <= 10000)
 })
 
+test('a draft with a staged copy autosaves to the staged copy, and a scheduled post is never autosaved', () => {
+  // The editor opens on the staged copy, so writing the draft row would be
+  // lost when the staged copy is published (review finding 1).
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'staged' }), 'staged')
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'in_review' }), 'paused')
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'approved' }), 'paused')
+  // A scheduled post goes live on its own: half-typed text must not (finding 2).
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true }), 'off')
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true, stagedReviewStatus: 'staged' }), 'staged')
+  assert.match(autosaveLabel({ target: 'off', dirty: true, saving: false, savedAt: null, error: null }), /scheduled post saves when you press Update/)
+})
+
 test('unsaved changes are content changes, not key order', () => {
   const saved = snapshot({ title: 'A', body: { type: 'doc', content: [] } })
   assert.equal(isDirty(saved, { body: { content: [], type: 'doc' }, title: 'A' }), false)

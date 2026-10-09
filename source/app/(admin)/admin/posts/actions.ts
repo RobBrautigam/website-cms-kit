@@ -187,10 +187,14 @@ export async function bulkPostAction(
     .in("id", unique);
   const readWrapped = wrapSupabaseError(readError);
   if (readWrapped) return readWrapped;
-  const { data: staged } = await supabase
+  // A failed read must stop the run: an empty list here would let bulk delete
+  // take posts whose staged work the foreign key then deletes with them.
+  const { data: staged, error: stagedError } = await supabase
     .from("blog_post_staged_changes")
     .select("post_id")
     .in("post_id", unique);
+  const stagedWrapped = wrapSupabaseError(stagedError);
+  if (stagedWrapped) return stagedWrapped;
   const withStage = new Set((staged ?? []).map((r) => r.post_id as string));
 
   const rows = posts ?? [];

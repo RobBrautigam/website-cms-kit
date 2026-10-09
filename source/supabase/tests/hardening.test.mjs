@@ -173,6 +173,13 @@ test('deleting a user keeps their audit rows (the actor link is cleared, nothing
   assert.equal(after.actor_email, 'admin@example.com')
 }))
 
+test('clearing the actor by hand is refused while the user still exists', () => scenario(async () => {
+  await asService(); const r = await audit()
+  await expectError(`update public.admin_audit_log set actor_user_id = null where id = $1`, [r.id], /append-only/)
+  await asOwner()
+  await expectError(`update public.admin_audit_log set actor_user_id = null where id = $1`, [r.id], /append-only/)
+}))
+
 // ------------------------------------------------------------- per-caller rate limits
 
 test('a caller gets the limit and no more inside one window', () => scenario(async () => {
@@ -227,6 +234,16 @@ test('one redirect has a ceiling across all callers, so rotating addresses canno
     answers.push((await rows(`select public.record_redirect_hit($1, $2, 30, 3, 600) as counted`, [REDIRECT, `198.51.100.${i}`]))[0].counted)
   }
   assert.deepEqual(answers, [true, true, true, false])
+}))
+
+test('a hit for a redirect that does not exist counts nothing and stores nothing', () => scenario(async () => {
+  await asService()
+  const unknown = '30000000-0000-4000-8000-0000000000ff'
+  const [r] = await rows(`select public.record_redirect_hit($1, '203.0.113.7', 5, 1000, 600) as counted`, [unknown])
+  assert.equal(r.counted, false)
+  await asOwner()
+  const [n] = await rows(`select count(*)::int as n from public.api_rate_limits where caller like '%' || $1 || '%'`, [unknown])
+  assert.equal(n.n, 0)
 }))
 
 // ------------------------------------------------------------- slug swap

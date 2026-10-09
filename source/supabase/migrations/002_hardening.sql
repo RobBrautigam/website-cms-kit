@@ -2,15 +2,18 @@
 -- Website CMS Kit - hardening
 -- ============================================================================
 -- Run after 001_staging_and_approval.sql. Idempotent, so it is safe to re-run.
--- It replaces publish_staged_posts() from 001: if you ever re-run 001, run
--- this file again after it. Tests: source/supabase/tests/hardening.test.mjs.
+-- It replaces publish_staged_posts() from 001 and tightens two things 000
+-- sets up (who may call increment_redirect_hit(), and the two-factor rule on
+-- image uploads): if you ever re-run 000 or 001, run this file again after
+-- it. Tests: source/supabase/tests/hardening.test.mjs.
 --
 --   14. The audit log is append-only by trigger, not only by policy.
 --   15. Per-caller rate limits (the AI routes, the redirect counter), kept in
 --       the database so they survive a restart and hold across servers.
 --   16. A slug swap between two staged changes publishes in one batch.
---   17. The opt-in two-person lock: with review required, nothing reaches the
---       live site without a second admin's approval.
+--   17. The opt-in two-person lock: with review required, no post's content
+--       or status reaches the live site without a second admin's approval
+--       (posts only: images, redirects and the other tables are outside it).
 --   18. Images uploaded for a staged change stay private until publish.
 -- ============================================================================
 
@@ -25,7 +28,10 @@
 --     retention job keeps working, while recent history cannot be erased;
 --   - clearing actor_user_id when that user is deleted (the foreign key's
 --     ON DELETE SET NULL), so deleting a user does not fail; the row keeps
---     actor_email and everything else.
+--     actor_email and everything else. Only once the user is really gone:
+--     clearing it by hand while the user exists is refused.
+-- The check function runs as its owner so it can look in auth.users; it
+-- returns a trigger, so nobody can call it directly.
 -- The table owner can still disable a trigger; ship rows to external storage
 -- if you need evidence that survives the database owner.
 create or replace function public.admin_audit_log_retention()
@@ -43,6 +49,7 @@ grant execute on function public.admin_audit_log_retention() to authenticated, s
 create or replace function public.admin_audit_log_append_only()
   returns trigger
   language plpgsql
+  security definer
   set search_path = ''
 as $$
 begin
@@ -52,7 +59,8 @@ begin
     end if;
   elsif tg_op = 'UPDATE' then
     if old.actor_user_id is not null and new.actor_user_id is null
-       and to_jsonb(new) - 'actor_user_id' = to_jsonb(old) - 'actor_user_id' then
+       and to_jsonb(new) - 'actor_user_id' = to_jsonb(old) - 'actor_user_id'
+       and not exists (select 1 from auth.users where id = old.actor_user_id) then
       return new;
     end if;
   end if;
@@ -136,8 +144,10 @@ grant execute on function public.consume_rate_limit(text, text, integer, integer
 -- directly, so anyone could inflate any count. Now only the server counts a
 -- hit, through this function: per caller (the visitor's address, read by the
 -- server from the header your host sets) and with a ceiling per redirect, so
--- rotating made-up addresses cannot inflate one redirect either. Returns
--- whether the hit was counted.
+-- rotating made-up addresses can add at most the ceiling to one redirect per
+-- window. An id that is not a redirect is refused before anything is
+-- written, so made-up ids cannot grow api_rate_limits. Returns whether the
+-- hit was counted.
 create or replace function public.record_redirect_hit(
   redirect_id uuid,
   caller_key text,
@@ -151,6 +161,9 @@ create or replace function public.record_redirect_hit(
   set search_path = ''
 as $$
 begin
+  if not exists (select 1 from public.url_redirects where id = redirect_id) then
+    return false;
+  end if;
   if not public.consume_rate_limit('redirect_hit', coalesce(nullif(caller_key, ''), 'unknown') || ':' || redirect_id, per_caller_max, window_seconds) then
     return false;
   end if;
@@ -273,8 +286,10 @@ grant execute on function public.publish_staged_posts(uuid[]) to authenticated, 
 -- ----------------------------------------------------------------------------
 -- With public.staging_review_required() returning true, a signed-in admin
 -- (role `authenticated`, the Data API and the cookie session alike) can no
--- longer change what the public site shows except by publishing a change a
--- second admin approved:
+-- longer change a post's content or status on the public site except by
+-- publishing a change a second admin approved. The lock covers blog_posts
+-- only: image files, url_redirects, testimonials and the other tables stay
+-- under ordinary admin rights.
 --   - a new post starts as a draft (not published, not scheduled);
 --   - a draft's content can be edited freely (it is not on the site);
 --   - a live or scheduled post can be taken down (back to draft, content as

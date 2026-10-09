@@ -47,10 +47,10 @@ test('a generated post is refused for a bad slug, an unknown node, an unknown ma
 test('model output carrying a script link or a script image is refused, a safe one passes', () => {
   const linked = (href) => post({ body: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href } }] }] }]) })
   const image = (src) => post({ body: doc([{ type: 'image', attrs: { src, alt: 'A chart' } }]) })
-  for (const bad of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x', 'vbscript:x', '//evil.example/x']) {
+  for (const bad of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,x', 'vbscript:x', '//evil.example/x', '/\\evil.example/x']) {
     assert.equal(parseModelJson(JSON.stringify(linked(bad)), GeneratedPost).ok, false, bad)
   }
-  for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,x', 'http://example.com/x.png']) {
+  for (const bad of ['javascript:alert(1)', 'data:image/svg+xml,x', 'http://example.com/x.png', '/\\evil.example/pixel.png', '//evil.example/pixel.png']) {
     assert.equal(parseModelJson(JSON.stringify(image(bad)), GeneratedPost).ok, false, bad)
   }
   for (const good of ['https://example.com/a', '/blog/a-post', '#faq', 'mailto:hi@example.com']) {
