@@ -70,6 +70,35 @@ test('at_publish: a scheduled post\'s images stay private when it is scheduled, 
   assert.equal(fakes.storage.public.has(A), true)
 })
 
+test('at_publish: when the schedule cannot be read, nothing goes public early (fails closed) and the warning says why', async () => {
+  process.env.SCHEDULED_IMAGES = 'at_publish'
+  const { publishStaged } = await staging()
+  fakes.tables.blog_post_staged_changes = [stageRow()]
+  fakes.tables.blog_posts = [{ id: POST_ID, title: 'Dry gardens', status: 'scheduled', published_at: inMinutes(60 * 24), featured_image_url: IMG(A) }]
+  fakes.storage.staged.add(A)
+  fakes.failSelect.blog_posts = 'connection reset'
+  const r = await publishStaged([STAGE_ID])
+  assert.equal(fakes.storage.public.has(A), false)
+  assert.match(r.data?.imageWarning ?? '', /could not be read/)
+})
+
+test('the job also copies the images of a post the database scheduler already published (the 003 job still running)', async () => {
+  process.env.SCHEDULED_IMAGES = 'at_publish'
+  process.env.CRON_SECRET = SECRET
+  const { POST } = await cron()
+  fakes.tables.blog_posts = [
+    { id: POST_ID, title: 'Published by the database job', status: 'published', published_at: inMinutes(-1), featured_image_url: IMG(A) },
+    { id: LATER_ID, title: 'Published long ago', status: 'published', published_at: inMinutes(-60 * 48), featured_image_url: IMG(B) },
+  ]
+  fakes.storage.staged.add(A)
+  fakes.storage.staged.add(B)
+  fakes.rpc.run_scheduled_publishing = () => ({ data: { published: 0, unpublished: 0 }, error: null })
+  const body = await (await POST(cronCall(`Bearer ${SECRET}`))).json()
+  assert.equal(fakes.storage.public.has(A), true)
+  assert.equal(fakes.storage.public.has(B), false)
+  assert.equal(body.imagesPromoted, 1)
+})
+
 test('the job refuses without a long enough secret (503) or with the wrong one (401), and does nothing', async () => {
   const { POST } = await cron()
   fakes.tables.blog_posts = [{ id: POST_ID, status: 'scheduled', published_at: inMinutes(1), featured_image_url: IMG(A) }]

@@ -23,6 +23,9 @@ function bucket(name) {
       for (const p of gone) files().delete(p)
       return { data: gone.map((name) => ({ name })), error: null }
     },
+    async exists(path) {
+      return { data: files().has(path), error: null }
+    },
     async list() {
       return { data: [...files()].map((p) => ({ name: p.replace(/^blog\//, ''), created_at: '2026-01-01T00:00:00Z' })), error: null }
     },
@@ -45,11 +48,13 @@ function table(name) {
   const filters = []
   const matches = (r) =>
     filters.every(([kind, col, v]) =>
-      kind === 'in' ? v.includes(r[col]) : kind === 'lte' ? r[col] != null && String(r[col]) <= String(v) : r[col] === v
+      kind === 'in' ? v.includes(r[col]) : kind === 'lte' ? r[col] != null && String(r[col]) <= String(v)
+        : kind === 'gte' ? r[col] != null && String(r[col]) >= String(v) : r[col] === v
     )
   const run = async (single) => {
     calls.queries.push({ table: name, op, payload, filters: filters.map(([, c, v]) => [c, v]) })
     const one = (list) => (single ? (list[0] ?? null) : list)
+    if (op === 'select' && fakes.failSelect[name]) return { data: null, error: { message: fakes.failSelect[name] } }
     if (op === 'insert') {
       if (fakes.failInsert[name]) return { data: null, error: { message: fakes.failInsert[name] } }
       const added = []
@@ -86,6 +91,7 @@ function table(name) {
     eq(col, v) { filters.push(['eq', col, v]); return q },
     in(col, v) { filters.push(['in', col, v]); return q },
     lte(col, v) { filters.push(['lte', col, v]); return q },
+    gte(col, v) { filters.push(['gte', col, v]); return q },
     maybeSingle() { return run(true) },
     single() { return run(true) },
     then(resolve, reject) { return run(false).then(resolve, reject) },

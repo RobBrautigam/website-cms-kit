@@ -37,7 +37,7 @@ export type PickerAsset = { path: string; url: string; alt: string; state: Media
  */
 export async function listMediaForPicker(): Promise<ActionResult<PickerAsset[]>> {
   await requireAdmin();
-  const result = await loadMediaLibrary();
+  const result = await loadMediaLibrary({ uses: false });
   if ("error" in result) return err(result.error, "server");
   const svc = createServiceClient();
   return ok(

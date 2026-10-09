@@ -17,16 +17,28 @@ import { scheduledImagesCutoff } from '@/lib/staging/scheduled-images'
  * Needed only with SCHEDULED_IMAGES=at_publish; without it a scheduled
  * post's images are already public and this job only runs the scheduler.
  */
+const RECENTLY_PUBLISHED_MS = 24 * 60 * 60 * 1000
+
 export async function POST(request: Request) {
   const refused = cronRefusal(request)
   if (refused) return refused
 
   const svc = createServiceClient()
-  const { data: due, error } = await svc
+  const { data: scheduled, error: scheduledError } = await svc
     .from('blog_posts')
     .select('id, title, featured_image_url, body')
     .eq('status', 'scheduled')
     .lte('published_at', scheduledImagesCutoff())
+  // A post the database-only job (003) or anything else already published in
+  // the last day: its images may still be private (1.5.0 review). Promotion
+  // is idempotent, so a post whose images are public costs one check each.
+  const { data: published, error: publishedError } = await svc
+    .from('blog_posts')
+    .select('id, title, featured_image_url, body')
+    .eq('status', 'published')
+    .gte('published_at', new Date(Date.now() - RECENTLY_PUBLISHED_MS).toISOString())
+  const error = scheduledError ?? publishedError
+  const due = [...(scheduled ?? []), ...(published ?? [])]
   // Failures answer with fixed text; the database's and storage's own
   // messages go to the server log only.
   if (error) {
@@ -36,7 +48,7 @@ export async function POST(request: Request) {
 
   let imagesPromoted = 0
   const imageProblems: { id: string; title: string; error: string }[] = []
-  for (const post of due ?? []) {
+  for (const post of due) {
     const failed = await promoteImages(post, post.id as string)
     if (failed) {
       console.error('scheduled-publishing: images not public', post.id, failed)

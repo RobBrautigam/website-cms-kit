@@ -2,16 +2,16 @@
 -- Website CMS Kit - the media library
 -- ============================================================================
 -- Run after 003_revisions_and_scheduling.sql. Idempotent, so it is safe to
--- re-run. It replaces the two image delete policies (000 section 9 and 003
--- section 19a): if you ever re-run 000, 002 or 003, run this file again after
--- it.
+-- re-run. It replaces the image delete and update policies of both buckets
+-- (000 section 9 and 003 section 19a): if you ever re-run 000, 002 or 003, run
+-- this file again after it.
 -- Tests: source/supabase/tests/media.test.mjs.
 --
 --   23. Alt text per asset: one row per image file, kept by admins, offered
 --       when the image is picked again for another post.
---   24. A used image is never deleted: an admin cannot delete a file a post,
---       a staged copy, a kept revision or a testimonial still shows, in either
---       bucket.
+--   24. A used image is never deleted, overwritten or moved: an admin cannot
+--       remove a file a post, a staged copy, a kept revision or a testimonial
+--       still shows, in either bucket.
 --
 -- Nothing here touches the promotion ledger (003 section 22): the server's
 -- promotion stays the only way into the public bucket while review is
@@ -31,7 +31,8 @@ create table if not exists public.blog_media (
   path text primary key
     check (path ~ '^blog/[A-Za-z0-9-]{8,64}\.(jpg|png|webp|gif)$'),
   alt text not null default '' check (char_length(alt) <= 200),
-  uploaded_by uuid default auth.uid() references auth.users(id) on delete set null,
+  -- Who first saved alt text for the file (the uploader is storage.objects.owner).
+  created_by uuid default auth.uid() references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
@@ -95,12 +96,11 @@ create policy "blog_media_require_mfa"
 -- ----------------------------------------------------------------------------
 -- 24. A used image is never deleted
 -- ----------------------------------------------------------------------------
--- True when any post, staged copy, kept revision or testimonial holds the
--- file's public URL (content always stores the final public URL, staged or
--- not, so one test covers both buckets). SECURITY DEFINER so the storage policies below can
--- ask it for an admin who cannot read every table it looks at; it answers
--- yes or no and returns nothing else.
-create or replace function public.blog_image_in_use(image_path text)
+-- True when any post, staged copy or kept revision holds the file's public
+-- URL (content always stores the final public URL, staged or not, so one test
+-- covers both buckets). The server alone may ask it: a testimonial save uses
+-- it to leave a post's images to their post.
+create or replace function public.blog_image_in_posts(image_path text)
 returns boolean
 language sql
 stable
@@ -119,13 +119,36 @@ as $$
     select 1 from public.blog_post_revisions r
     where strpos(coalesce(r.featured_image_url, ''), '/blog-images/' || image_path) > 0
        or strpos(coalesce(r.body::text, ''), '/blog-images/' || image_path) > 0
-  ) or exists (
-    -- Testimonials upload through the same picker into the same buckets.
-    select 1 from public.testimonials t
-    where strpos(coalesce(t.headshot_url, ''), '/blog-images/' || image_path) > 0
-       or strpos(coalesce(t.screenshot_url, ''), '/blog-images/' || image_path) > 0
-       or strpos(coalesce(t.video_thumbnail_url, ''), '/blog-images/' || image_path) > 0
   );
+$$;
+
+revoke all on function public.blog_image_in_posts(text) from public, anon, authenticated;
+grant execute on function public.blog_image_in_posts(text) to service_role;
+
+-- The same, plus testimonials (they upload into the same buckets). SECURITY
+-- DEFINER so the storage policies below can ask it for an admin who cannot
+-- read every table it looks at. It reads private text as its owner, so it
+-- answers only an active admin with two-factor done, and only for a kit path;
+-- anyone else, or any other text, gets "in use" (no oracle on drafts), which
+-- also keeps the policies below refusing.
+create or replace function public.blog_image_in_use(image_path text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when image_path is null or image_path !~ '^blog/[A-Za-z0-9-]{8,64}\.(jpg|png|webp|gif)$' then true
+    when not public.is_admin_or_above(auth.uid()) then true
+    when not public.mfa_satisfied() then true
+    else public.blog_image_in_posts(image_path) or exists (
+      select 1 from public.testimonials t
+      where strpos(coalesce(t.headshot_url, ''), '/blog-images/' || image_path) > 0
+         or strpos(coalesce(t.screenshot_url, ''), '/blog-images/' || image_path) > 0
+         or strpos(coalesce(t.video_thumbnail_url, ''), '/blog-images/' || image_path) > 0
+    )
+  end;
 $$;
 
 revoke all on function public.blog_image_in_use(text) from public, anon;
@@ -148,3 +171,24 @@ create policy "blog_images_staged_admin_delete"
   using (bucket_id = 'blog-images-staged' and public.is_admin_or_above(auth.uid())
          and not public.staging_review_required()
          and not public.blog_image_in_use(name));
+
+-- Overwriting or moving a file removes it from its path just as surely, so the
+-- update policies (003 section 19a) ask the same check. Under review nobody
+-- updates either bucket anyway.
+drop policy if exists "blog_images_admin_update" on storage.objects;
+create policy "blog_images_admin_update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid())
+         and not public.staging_review_required()
+         and not public.blog_image_in_use(name))
+  with check (bucket_id = 'blog-images' and public.is_admin_or_above(auth.uid())
+              and not public.staging_review_required());
+
+drop policy if exists "blog_images_staged_admin_update" on storage.objects;
+create policy "blog_images_staged_admin_update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'blog-images-staged' and public.is_admin_or_above(auth.uid())
+         and not public.staging_review_required()
+         and not public.blog_image_in_use(name))
+  with check (bucket_id = 'blog-images-staged' and public.is_admin_or_above(auth.uid())
+              and not public.staging_review_required());

@@ -122,21 +122,21 @@ test('migration 004 can be run again on a database that already has it', () => s
 test('alt text per asset: an admin saves it, and the database records who and when', () => scenario(async () => {
   await asUser(ADMIN)
   const [m] = await rows(`insert into public.blog_media (path, alt) values ($1, 'A wide field at dawn') returning *`, [ON_LIVE])
-  assert.equal(m.uploaded_by, ADMIN)
+  assert.equal(m.created_by, ADMIN)
   assert.equal(m.updated_by, ADMIN)
   await asUser(SUPER)
   const [u] = await rows(`update public.blog_media set alt = 'A wide field at first light' where path = $1 returning *`, [ON_LIVE])
   assert.equal(u.alt, 'A wide field at first light')
-  assert.equal(u.uploaded_by, ADMIN)
+  assert.equal(u.created_by, ADMIN)
   assert.equal(u.updated_by, SUPER)
 }))
 
-test('alt text per asset: who uploaded it and the path cannot be forged or rewritten, and nobody deletes the record by hand', () => scenario(async () => {
+test('alt text per asset: who first saved it and the path cannot be forged or rewritten, and nobody deletes the record by hand', () => scenario(async () => {
   await asUser(ADMIN)
-  await expectError(`insert into public.blog_media (path, alt, uploaded_by) values ($1, 'x', $2)`, [ON_LIVE, SUPER], /permission denied/)
+  await expectError(`insert into public.blog_media (path, alt, created_by) values ($1, 'x', $2)`, [ON_LIVE, SUPER], /permission denied/)
   await rows(`insert into public.blog_media (path, alt) values ($1, 'x')`, [ON_LIVE])
   await expectError(`update public.blog_media set path = $2 where path = $1`, [ON_LIVE, UNUSED_PUBLIC], /permission denied/)
-  await expectError(`update public.blog_media set uploaded_by = $2 where path = $1`, [ON_LIVE, SUPER], /permission denied/)
+  await expectError(`update public.blog_media set created_by = $2 where path = $1`, [ON_LIVE, SUPER], /permission denied/)
   await expectError(`delete from public.blog_media where path = $1`, [ON_LIVE], /permission denied/)
 }))
 
@@ -207,6 +207,41 @@ test('the in-use check: admins and the policies can ask it, the public cannot', 
   const [p] = await rows(`select has_function_privilege('anon', 'public.blog_media_stamp()', 'EXECUTE') as anon,
     has_function_privilege('authenticated', 'public.blog_media_stamp()', 'EXECUTE') as auth`)
   assert.deepEqual([p.anon, p.auth], [false, false])
+}))
+
+test('the in-use check tells nothing to a signed-in outsider or an admin without two-factor done, and takes only a kit path', () => scenario(async () => {
+  // It reads draft, staged and revision bodies as their owner, so anyone else
+  // gets "in use" whatever they ask: no oracle on private text.
+  await asUser(OUTSIDER)
+  const [o] = await rows(`select public.blog_image_in_use($1) as unused, public.blog_image_in_use('blog/a') as probe`, [UNUSED_PUBLIC])
+  assert.deepEqual([o.unused, o.probe], [true, true])
+  await asUser(ADMIN, 'aal1')
+  const [a1] = await rows(`select public.blog_image_in_use($1) as unused`, [UNUSED_PUBLIC])
+  assert.equal(a1.unused, true)
+  await asUser(ADMIN)
+  const [a2] = await rows(`select public.blog_image_in_use($1) as unused, public.blog_image_in_use($2) as text_probe`,
+    [UNUSED_PUBLIC, `${IN_STAGED.slice(0, 10)}`])
+  assert.deepEqual([a2.unused, a2.text_probe], [false, true])
+}))
+
+test('a used image cannot be overwritten or moved either (review off): the update policies ask the same check', () => scenario(async () => {
+  await asUser(ADMIN)
+  const move = (bucket, name) =>
+    rows(`update storage.objects set name = name || '.moved' where bucket_id = $1 and name = $2 returning name`, [bucket, name])
+  assert.equal((await move('blog-images', ON_LIVE)).length, 0)
+  assert.equal((await move('blog-images-staged', IN_STAGED)).length, 0)
+  assert.equal((await move('blog-images', UNUSED_PUBLIC)).length, 1)
+  assert.equal((await move('blog-images-staged', UNUSED_STAGED)).length, 1)
+}))
+
+test('the posts-only check (for testimonial saves) answers the server alone', () => scenario(async () => {
+  await asService()
+  const [r] = await rows(`select public.blog_image_in_posts($1) as live, public.blog_image_in_posts($2) as staged,
+    public.blog_image_in_posts($3) as revision, public.blog_image_in_posts($4) as headshot, public.blog_image_in_posts($5) as unused`,
+  [ON_LIVE, IN_STAGED, IN_REVISION, HEADSHOT, UNUSED_PUBLIC])
+  assert.deepEqual([r.live, r.staged, r.revision, r.headshot, r.unused], [true, true, true, false, false])
+  await asUser(ADMIN)
+  await expectError(`select public.blog_image_in_posts($1)`, [ON_LIVE], /permission denied/)
 }))
 
 test('review required: an alt text record opens no door to the public bucket (the promotion ledger stays the only one)', () => scenario(async () => {

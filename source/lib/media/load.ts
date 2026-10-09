@@ -10,9 +10,12 @@ const PAGE = 1000
  * caller's own admin check: both buckets' files, the promotion ledger, the
  * alt text per asset, and every post, staged copy, kept revision and
  * testimonial that could use a file (lib/media/library.ts turns it into one
- * list).
+ * list). With `uses: false` (the editor's picker) it skips the content
+ * tables, so opening the picker never reads every post body and revision.
  */
-export async function loadMediaLibrary(): Promise<{ assets: MediaAsset[] } | { error: string }> {
+export async function loadMediaLibrary(
+  { uses = true }: { uses?: boolean } = {}
+): Promise<{ assets: MediaAsset[] } | { error: string }> {
   const svc = createServiceClient()
 
   const listAll = async (bucket: string): Promise<StorageObject[] | string> => {
@@ -52,10 +55,10 @@ export async function loadMediaLibrary(): Promise<{ assets: MediaAsset[] } | { e
       'path, post_id, promoted_at'
     ),
     readAll<{ path: string; alt: string }>('blog_media', 'path, alt'),
-    readAll<ContentRow>('blog_posts', 'id, title, featured_image_url, body'),
-    readAll<ContentRow>('blog_post_staged_changes', 'post_id, title, featured_image_url, body'),
-    readAll<ContentRow>('blog_post_revisions', 'post_id, title, featured_image_url, body'),
-    readAll<TestimonialRow>('testimonials', 'id, name, headshot_url, screenshot_url, video_thumbnail_url'),
+    uses ? readAll<ContentRow>('blog_posts', 'id, title, featured_image_url, body') : [],
+    uses ? readAll<ContentRow>('blog_post_staged_changes', 'post_id, title, featured_image_url, body') : [],
+    uses ? readAll<ContentRow>('blog_post_revisions', 'post_id, title, featured_image_url, body') : [],
+    uses ? readAll<TestimonialRow>('testimonials', 'id, name, headshot_url, screenshot_url, video_thumbnail_url') : [],
   ])
   for (const part of [staged, pub, promotions, alts, posts, stagedRows, revisions, testimonials]) {
     if (typeof part === 'string') {

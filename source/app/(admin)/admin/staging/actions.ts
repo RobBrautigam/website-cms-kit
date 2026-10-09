@@ -297,8 +297,12 @@ async function promoteAfterPublish(
       .from("blog_posts")
       .select("id, status, published_at")
       .in("id", rows.map((r) => r.post_id));
-    // Unread, nothing waits: the images go public now, as without the setting.
-    if (error) console.error("promoteAfterPublish: schedule not read", error.message);
+    // Unread, nothing is copied: a post scheduled for later must not go public
+    // early (1.5.0 review). Make images public, or the job at the date, does it.
+    if (error) {
+      console.error("promoteAfterPublish: schedule not read", error.message);
+      return "Published, but the images were not made public: the post's schedule could not be read. Open the post and press Make images public; a scheduled post's images go public at its date.";
+    }
     waiting = new Set((data ?? []).filter((p) => imagesWaitForDate(p)).map((p) => p.id as string));
   }
   const problems: string[] = [];
@@ -609,7 +613,16 @@ export async function cleanupStagedImages(): Promise<ActionResult<{ removed: num
     for (const o of data ?? []) objects.push({ name: o.name, created_at: o.created_at ?? null });
     if (!data || data.length < PAGE) break;
   }
-  const remove = planOrphanCleanup(objects, [...referenced]);
+  // The database's in-use check (migration 004) is the same one the delete
+  // policies use; it also sees an address in a link or a resized-image URL,
+  // which the image extractor above does not read (1.5.0 review). A failed
+  // check keeps the file.
+  const supabase = await createServerSupabaseClient();
+  const remove: string[] = [];
+  for (const path of planOrphanCleanup(objects, [...referenced])) {
+    const { data: inUse, error } = await supabase.rpc("blog_image_in_use", { image_path: path });
+    if (!error && inUse === false) remove.push(path);
+  }
   for (let i = 0; i < remove.length; i += 100) {
     const { error } = await svc.storage.from(STAGED_BUCKET).remove(remove.slice(i, i + 100));
     if (error) return err(`Could not remove the staged images: ${error.message}`, "server");

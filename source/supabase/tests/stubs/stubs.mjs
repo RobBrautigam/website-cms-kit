@@ -31,6 +31,7 @@ export const fakes = {
   tables: {},
   /** Tables whose next insert fails with this message. */
   failInsert: {},
+  failSelect: {},
   /** rpc answers by name: a function of the args returning { data, error }. */
   rpc: {},
   /** The recovery-code row id findUnusedRecoveryCodeId returns (null: no match). */
@@ -59,6 +60,7 @@ export function resetStubs() {
   fakes.limits = {}
   fakes.tables = {}
   fakes.failInsert = {}
+  fakes.failSelect = {}
   fakes.rpc = {}
   fakes.recoveryCode = null
   fakes.beforeUpdate = {}
