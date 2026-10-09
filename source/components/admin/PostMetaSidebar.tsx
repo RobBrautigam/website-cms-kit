@@ -212,9 +212,10 @@ export default function PostMetaSidebar({ meta, onChange, statusLockedNote }: Po
       {/* Scheduled Date */}
       {meta.status === 'scheduled' && (
         <div>
-          <label className="block text-sm font-semibold text-text-secondary mb-1.5">Publish Date & Time</label>
+          <label className="block text-sm font-semibold text-text-secondary mb-1.5">Publish date and time (UTC)</label>
           <input
             type="datetime-local"
+            disabled={!!statusLockedNote}
             value={meta.publishedAt}
             onChange={(e) => update({ publishedAt: e.target.value })}
             className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-2 focus:ring-accent text-sm transition"

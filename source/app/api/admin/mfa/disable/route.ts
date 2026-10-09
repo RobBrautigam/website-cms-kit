@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { deleteAllRecoveryCodes } from "@/lib/auth/mfa";
-import { passwordMatches } from "@/lib/auth/reauth";
+import { reauthRefusal } from "@/lib/auth/reauth-guard";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { crossSiteRefusal } from "@/lib/security/request-origin";
 
@@ -27,9 +27,9 @@ export async function POST(req: Request) {
   // Re-authenticate with the password before letting them disable a security
   // factor (lib/auth/reauth.ts: a throwaway client, so this verified AAL2
   // session is kept; Supabase refuses to unenroll a verified factor below AAL2).
-  if (!(await passwordMatches(user.email!, password, "mfa/disable"))) {
-    return Response.json({ error: "Wrong password" }, { status: 401 });
-  }
+  // Limited per admin, every failure audited (lib/auth/reauth-guard.ts).
+  const wrong = await reauthRefusal(user, password, "mfa/disable");
+  if (wrong) return wrong;
 
   const supabase = await createServerSupabaseClient();
   const { error: unenrollError } = await supabase.auth.mfa.unenroll({

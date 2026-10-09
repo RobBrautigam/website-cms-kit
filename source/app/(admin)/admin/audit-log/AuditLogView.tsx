@@ -30,7 +30,12 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
   {
     label: "Staging and approval",
     actions:
-      "blog_post.stage,blog_post.request_review,blog_post.approve,blog_post.withdraw_review,blog_post.discard_staged,blog_post.publish_staged,staging.preview_enabled",
+      "blog_post.stage,blog_post.request_review,blog_post.approve,blog_post.withdraw_review,blog_post.discard_staged,blog_post.publish_staged,staging.preview_enabled,blog_post.images_promoted,staging.orphans_cleaned",
+  },
+  {
+    label: "Revisions and scheduling",
+    actions:
+      "blog_post.restore_revision,blog_post.schedule_update,blog_post.scheduled_publish,blog_post.scheduled_unpublish",
   },
   { label: "Jobs", actions: "job.create,job.update,job.delete" },
   {
@@ -52,6 +57,11 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
     label: "MFA events",
     actions:
       "auth.mfa.enrolled,auth.mfa.verified,auth.mfa.recovery_code_used,auth.mfa.disabled,auth.mfa.regenerated_codes,auth.mfa.reset_by_operator",
+  },
+  {
+    label: "Failed or limited re-checks",
+    actions:
+      "auth.reauth_failed,auth.reauth_limited,auth.mfa.recovery_code_failed,auth.mfa.recovery_limited",
   },
   { label: "Audit log exports", actions: "audit_log.export_csv" },
 ];

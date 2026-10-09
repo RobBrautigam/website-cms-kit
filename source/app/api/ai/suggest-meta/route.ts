@@ -4,9 +4,11 @@ import { requireAdmin } from '@/lib/auth/require'
 import { crossSiteRefusal } from '@/lib/security/request-origin'
 import { aiLimitRefusal } from '@/lib/security/rate-limit'
 import { consumeAiCall } from '@/lib/security/rate-limit-db'
+import { beginAiSpend } from '@/lib/ai/spend'
 import { MetaInput, MetaSuggestion, parseModelJson } from '@/lib/ai/schemas'
 
 const client = new Anthropic()
+const MODEL = 'claude-sonnet-4-20250514'
 
 export async function POST(request: NextRequest) {
   const refused = crossSiteRefusal(request)
@@ -14,17 +16,20 @@ export async function POST(request: NextRequest) {
   // Admin-only: /api/* is not covered by the proxy, so gate here before any
   // paid call. Outside the try so the redirect-throw isn't caught as a 500.
   const { user } = await requireAdmin()
+  // The body first: a malformed request is refused before any budget is spent.
+  const input = MetaInput.safeParse(await request.json().catch(() => null))
+  if (!input.success) {
+    return NextResponse.json({ error: 'Send a title (up to 300 characters) and an excerpt (up to 2,000).' }, { status: 400 })
+  }
+  const { title, excerpt } = input.data
   const limited = await aiLimitRefusal(() => consumeAiCall(user.id))
   if (limited) return limited
+  // No spend record, no call (lib/ai/spend.ts).
+  const spend = await beginAiSpend(user.id, 'ai/suggest-meta', MODEL)
+  if (spend instanceof Response) return spend
   try {
-    const input = MetaInput.safeParse(await request.json().catch(() => null))
-    if (!input.success) {
-      return NextResponse.json({ error: 'Send a title (up to 300 characters) and an excerpt (up to 2,000).' }, { status: 400 })
-    }
-    const { title, excerpt } = input.data
-
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: 300,
       system: 'You write SEO meta descriptions for blog posts. Keep it under 155 characters, compelling, and action-oriented. Return a JSON object: { "metaDescription": "..." }. Return ONLY the JSON, no other text.',
       messages: [{
@@ -32,6 +37,7 @@ export async function POST(request: NextRequest) {
         content: `Write a meta description for:\nTitle: ${title}\nExcerpt: ${excerpt || 'no excerpt'}`
       }],
     })
+    await spend.settle(message.usage)
 
     const textContent = message.content.find((c) => c.type === 'text')
     if (!textContent || textContent.type !== 'text') {

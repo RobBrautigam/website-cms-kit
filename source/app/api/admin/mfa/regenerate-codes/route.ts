@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require";
 import { regenerateRecoveryCodes } from "@/lib/auth/mfa";
 import { recordAdminAction } from "@/lib/auth/audit";
-import { passwordMatches } from "@/lib/auth/reauth";
+import { reauthRefusal } from "@/lib/auth/reauth-guard";
 import { crossSiteRefusal } from "@/lib/security/request-origin";
 
 /**
@@ -9,7 +9,8 @@ import { crossSiteRefusal } from "@/lib/security/request-origin";
  *
  * New recovery codes replace the old ones, so the caller proves the password
  * first (the same re-check as turning two-factor off). Without it, a stolen
- * session could mint codes that sign in past two-factor later.
+ * session could mint codes that sign in past two-factor later. The re-check
+ * is limited per admin and every failure is audited (lib/auth/reauth-guard.ts).
  */
 export async function POST(request: Request) {
   const refused = crossSiteRefusal(request);
@@ -25,9 +26,8 @@ export async function POST(request: Request) {
   if (typeof password !== "string" || password === "") {
     return Response.json({ error: "Your password is required" }, { status: 400 });
   }
-  if (!(await passwordMatches(user.email!, password, "mfa/regenerate-codes"))) {
-    return Response.json({ error: "Wrong password" }, { status: 401 });
-  }
+  const wrong = await reauthRefusal(user, password, "mfa/regenerate-codes");
+  if (wrong) return wrong;
   const codes = await regenerateRecoveryCodes(user.id);
   await recordAdminAction({ action: "auth.mfa.regenerated_codes" });
   return Response.json({ recovery_codes: codes });

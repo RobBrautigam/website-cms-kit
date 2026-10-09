@@ -8,22 +8,26 @@ import { RENDERED_MARKS, RENDERED_NODES } from '@/lib/tiptap/schema'
  * are checked before they reach the editor: model text is untrusted, so a
  * reply that is not the promised shape is a 502, never passed through. The
  * body may hold only node and mark types the public renderer draws.
+ *
+ * Inputs are strict: an unknown key (a model name, a token budget, a system
+ * prompt) is refused rather than quietly dropped, so a request never looks
+ * like it changed something it cannot change.
  */
 
 export const TitleInput = z.object({
   excerpt: z.string().max(2000).optional().default(''),
   currentTitle: z.string().max(300).optional().default(''),
-})
+}).strict()
 
 export const MetaInput = z.object({
   title: z.string().min(1).max(300),
   excerpt: z.string().max(2000).optional().default(''),
-})
+}).strict()
 
 export const GenerateInput = z.object({
   topic: z.string().trim().min(1, 'Topic is required').max(500),
   keywords: z.array(z.string().trim().min(1).max(80)).max(20).optional().default([]),
-})
+}).strict()
 
 export const TitleSuggestions = z.array(z.string().trim().min(1).max(200)).min(1).max(5)
 

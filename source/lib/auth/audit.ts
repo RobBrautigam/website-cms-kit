@@ -3,6 +3,7 @@ import {
   createServiceClient,
   createServerSupabaseClient,
 } from "@/lib/supabase/server";
+import { clientAddress } from "@/lib/security/rate-limit";
 import type { AdminRole } from "./types";
 
 /**
@@ -26,6 +27,13 @@ export type AuditAction =
   | "blog_post.discard_staged"
   | "blog_post.publish_staged"
   | "staging.preview_enabled"
+  // Revisions and scheduling (docs/12-revisions-and-scheduling.md)
+  | "blog_post.restore_revision"
+  | "blog_post.schedule_update"
+  | "blog_post.scheduled_publish"
+  | "blog_post.scheduled_unpublish"
+  | "blog_post.images_promoted"
+  | "staging.orphans_cleaned"
   | "job.create"
   | "job.update"
   | "job.delete"
@@ -54,6 +62,12 @@ export type AuditAction =
   | "auth.mfa.disabled"
   | "auth.mfa.regenerated_codes"
   | "auth.mfa.reset_by_operator"
+  // Signed-in re-checks that failed or hit their limit (the caller is a
+  // known admin, so a stranger cannot write these rows)
+  | "auth.reauth_failed"
+  | "auth.reauth_limited"
+  | "auth.mfa.recovery_code_failed"
+  | "auth.mfa.recovery_limited"
   // Meta
   | "audit_log.export_csv";
 
@@ -78,11 +92,10 @@ export interface RecordAdminActionInput {
  * console.error but never throw — losing an audit row is preferable to
  * breaking a mutation.
  *
- * Extracts the client IP — preferring the edge-set `cf-connecting-ip` (Cloudflare
- * populates it and the client cannot spoof it), falling back to `x-real-ip` then
- * the first `x-forwarded-for` hop for non-Cloudflare / local environments — and the
- * user-agent, when available. The first XFF hop alone is client-spoofable, so it is
- * the last resort, not the primary source.
+ * Extracts the client IP, preferring the edge-set `cf-connecting-ip` (Cloudflare
+ * populates it and the client cannot spoof it), else the X-Forwarded-For entry the
+ * trusted proxy wrote (clientAddress in lib/security/rate-limit.ts, never the
+ * client-written first entry), else `x-real-ip`; and the user-agent, when available.
  */
 export async function recordAdminAction(
   input: RecordAdminActionInput
@@ -107,11 +120,9 @@ export async function recordAdminAction(
       actor_email = actor_email ?? "(unknown)";
     }
 
+    const proxied = clientAddress(h);
     const ip =
-      h.get("cf-connecting-ip") ??
-      h.get("x-real-ip") ??
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      null;
+      h.get("cf-connecting-ip") ?? (proxied === "unknown" ? null : proxied);
 
     const svc = createServiceClient();
     const { error } = await svc.from("admin_audit_log").insert({

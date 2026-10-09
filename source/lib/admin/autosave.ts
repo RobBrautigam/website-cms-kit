@@ -8,10 +8,14 @@
  *     change already sent for review is left alone, since autosaving into it
  *     would change what the reviewer is approving;
  *   - a live post: its staged copy, never the live row;
- *   - a scheduled post: nowhere; it goes live on its own at its date, so
- *     half-typed text waits for Update;
+ *   - a scheduled post: its staged copy too (1.4.0); it goes live on its own
+ *     at its date, so half-typed text must never land in the row itself;
  *   - a draft: its own row, content fields only, never its status;
  *   - a new post: this browser only, until the first save creates the row.
+ *
+ * An explicit save and an autosave never race: `createSaveGate()` makes the
+ * save wait for an autosave already in flight, and starts no autosave while
+ * the save runs.
  */
 
 export const AUTOSAVE_DELAY_MS = 4000
@@ -26,9 +30,46 @@ export function autosaveTarget(opts: {
 }): AutosaveTarget {
   if (!opts.postId) return 'browser'
   if (opts.stagedReviewStatus === 'in_review' || opts.stagedReviewStatus === 'approved') return 'paused'
-  if (opts.stagedReviewStatus === 'staged' || opts.isLive) return 'staged'
-  if (opts.isScheduled) return 'off'
+  if (opts.stagedReviewStatus === 'staged' || opts.isLive || opts.isScheduled) return 'staged'
   return 'draft'
+}
+
+export type SaveGate = {
+  /** Runs `write` unless an autosave is in flight or a save holds the gate. Resolves true when it ran. */
+  autosave(write: () => Promise<unknown>): Promise<boolean>
+  /** Waits for an autosave in flight, then holds the gate until `endSave()`. */
+  beginSave(): Promise<void>
+  /** Opens the gate again (after a failed save, or when the editor stays open). */
+  endSave(): void
+  readonly busy: boolean
+}
+
+export function createSaveGate(): SaveGate {
+  let inFlight: Promise<unknown> | null = null
+  let saving = false
+  return {
+    async autosave(write) {
+      if (inFlight || saving) return false
+      const run = write()
+      inFlight = run
+      try {
+        await run
+      } finally {
+        inFlight = null
+      }
+      return true
+    },
+    async beginSave() {
+      saving = true
+      if (inFlight) await inFlight.catch(() => {})
+    },
+    endSave() {
+      saving = false
+    },
+    get busy() {
+      return inFlight !== null
+    },
+  }
 }
 
 /** A stable fingerprint of the content, independent of key order. */

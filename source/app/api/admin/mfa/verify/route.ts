@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/mfa";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { crossSiteRefusal } from "@/lib/security/request-origin";
+import { recoveryCodeRefusal } from "@/lib/auth/reauth-guard";
 
 export async function POST(req: Request) {
   const refused = crossSiteRefusal(req);
@@ -34,9 +35,14 @@ export async function POST(req: Request) {
     // session. If we just returned ok the user would bounce off requireAdmin's
     // aal2 gate back to this page, burning one single-use code per loop. Instead:
     // claim the code, unenroll the user's factor(s) so nextLevel drops to aal1,
-    // then send them to re-enroll.
+    // then send them to re-enroll. Attempts are limited per admin and a wrong
+    // code is audited (lib/auth/reauth-guard.ts), so a session that got past
+    // the password cannot work through guesses unseen.
+    const limited = await recoveryCodeRefusal(user.id);
+    if (limited) return limited;
     const codeRowId = await findUnusedRecoveryCodeId(user.id, code);
     if (!codeRowId) {
+      await recordAdminAction({ action: "auth.mfa.recovery_code_failed" });
       return Response.json({ error: "Invalid recovery code" }, { status: 400 });
     }
 

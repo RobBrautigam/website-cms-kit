@@ -8,9 +8,9 @@ import PostMetaSidebar from './PostMetaSidebar'
 import type { PostMeta } from './PostMetaSidebar'
 import TipTapRenderer from '@/components/TipTapRenderer'
 import Link from 'next/link'
-import { prepareToGoLive, publishNow, stageChanges } from '@/app/(admin)/admin/staging/actions'
+import { autosaveStaged, prepareToGoLive, promotePostImages, publishNow, stageChanges } from '@/app/(admin)/admin/staging/actions'
 import { altTextRefusal } from '@/lib/admin/alt-text'
-import { AUTOSAVE_DELAY_MS, autosaveLabel, autosaveTarget, isDirty, snapshot } from '@/lib/admin/autosave'
+import { AUTOSAVE_DELAY_MS, autosaveLabel, autosaveTarget, createSaveGate, isDirty, snapshot } from '@/lib/admin/autosave'
 import { reviewLabel, type ReviewStatus } from '@/lib/staging/rules'
 
 const DEFAULT_AUTHOR_SLUG = 'jane-doe'
@@ -35,15 +35,25 @@ interface PostFormProps {
   /** The post's staged copy, when it has one. initialData then carries the
    *  staged content, so the editor opens on the staged copy. */
   staged?: { id: string; reviewStatus: ReviewStatus } | null
+  /** Shown under the sidebar on the edit screen: the schedule and revisions panels. */
+  children?: React.ReactNode
 }
 
-export default function PostForm({ initialData, staged = null }: PostFormProps) {
+export default function PostForm({ initialData, staged = null, children }: PostFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const isEditing = !!initialData?.id
   // Edits to a live post go through staging (docs/10): "Stage changes" keeps
   // the live post as it is; "Publish now" stages and publishes in one step.
+  // A scheduled post does too (1.4.0): it goes live on its own at its date,
+  // so its edits wait in the staged copy and are applied the same way.
   const isLive = isEditing && initialData?.status === 'published'
+  const isScheduled = isEditing && initialData?.status === 'scheduled'
+  const viaStaging = isLive || isScheduled
+  // An explicit save waits for an autosave in flight and stops new ones.
+  const gate = useRef(createSaveGate()).current
+  const [pausedByReview, setPausedByReview] = useState(false)
+  const [imageWarning, setImageWarning] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -91,8 +101,8 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
   const target = autosaveTarget({
     postId: initialData?.id,
     isLive,
-    isScheduled: initialData?.status === 'scheduled',
-    stagedReviewStatus: staged?.reviewStatus ?? null,
+    isScheduled,
+    stagedReviewStatus: pausedByReview ? 'in_review' : (staged?.reviewStatus ?? null),
   })
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshot(contentOf(meta, body)))
   const [autosaving, setAutosaving] = useState(false)
@@ -122,22 +132,33 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
       const content = contentOf(meta, body)
       setAutosaving(true)
       let error: string | null = null
-      if (target === 'draft') {
-        const result = await supabase.from('blog_posts').update(content).eq('id', initialData!.id!)
-        error = result.error?.message ?? null
-      } else {
-        const result = await stageChanges(initialData!.id!, content)
-        error = result.ok ? null : result.error
+      try {
+        await gate.autosave(async () => {
+          if (target === 'draft') {
+            const result = await supabase.from('blog_posts').update(content).eq('id', initialData!.id!)
+            error = result.error?.message ?? null
+          } else {
+            // Into the staged copy, only while nobody has sent it for review.
+            const result = await autosaveStaged(initialData!.id!, content)
+            error = result.ok ? null : result.error
+            if (result.ok && result.data?.paused) {
+              setPausedByReview(true)
+              return
+            }
+          }
+          if (!error) {
+            setSavedSnapshot(snapshot(content))
+            setSavedAt(new Date())
+          }
+        })
+      } catch (e) {
+        error = e instanceof Error ? e.message : 'Autosave failed'
       }
       setAutosaving(false)
       setAutosaveError(error)
-      if (!error) {
-        setSavedSnapshot(snapshot(content))
-        setSavedAt(new Date())
-      }
     }, AUTOSAVE_DELAY_MS)
     return () => clearTimeout(timer)
-  }, [contentDirty, saving, autosaving, target, meta, body, contentOf, supabase, initialData])
+  }, [contentDirty, saving, autosaving, target, meta, body, contentOf, supabase, initialData, gate])
 
   function confirmLeave(): boolean {
     if (!dirty) return true
@@ -190,14 +211,17 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     if (meta.status === 'scheduled' && !meta.publishedAt) { alert('Scheduled posts need a publish date'); return }
 
     setSaving(true)
+    await gate.beginSave()
+    const stop = () => { gate.endSave(); setSaving(false) }
 
-    // Going live (now or on a schedule): alt text first, then the post's
-    // private staged images go public (lib/staging/images.ts).
-    if (meta.status !== 'draft') {
+    // Going live (now or on a schedule): alt text first. The post's private
+    // staged images go public only after the write below succeeded.
+    const goingLive = meta.status !== 'draft'
+    if (goingLive) {
       const missing = altTextRefusal({ featuredImageUrl: meta.featuredImageUrl, featuredImageAlt: meta.featuredImageAlt, body })
-      if (missing) { alert(missing); setSaving(false); return }
+      if (missing) { alert(missing); stop(); return }
       const ready = await prepareToGoLive({ featured_image_url: meta.featuredImageUrl, featured_image_alt: meta.featuredImageAlt, body })
-      if (!ready.ok) { alert(ready.error); setSaving(false); return }
+      if (!ready.ok) { alert(ready.error); stop(); return }
     }
 
     const postData: Record<string, unknown> = {
@@ -216,7 +240,8 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     if (meta.status === 'published') {
       postData.published_at = isEditing ? undefined : new Date().toISOString()
     } else if (meta.status === 'scheduled') {
-      postData.published_at = new Date(meta.publishedAt).toISOString()
+      // The field holds UTC (it says so); never the browser's own zone.
+      postData.published_at = new Date(`${meta.publishedAt}Z`).toISOString()
     } else {
       postData.published_at = null
     }
@@ -227,18 +252,27 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     })
 
     let error
+    let postId = initialData?.id
     if (isEditing) {
       const result = await supabase.from('blog_posts').update(postData).eq('id', initialData.id)
       error = result.error
     } else {
-      const result = await supabase.from('blog_posts').insert(postData)
+      const result = await supabase.from('blog_posts').insert(postData).select('id').single()
       error = result.error
+      postId = result.data?.id
     }
 
     if (error) {
       alert('Save failed: ' + error.message)
-      setSaving(false)
+      stop()
       return
+    }
+
+    if (goingLive && postId) {
+      const promoted = await promotePostImages(postId)
+      if (!promoted.ok) {
+        alert(`Saved, but an image could not be made public yet: ${promoted.error} Open the post and press Make images public to try again.`)
+      }
     }
 
     // Clear auto-saved draft
@@ -261,6 +295,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
     }
 
     setSaving(true)
+    await gate.beginSave()
     const content = contentOf(meta, body)
     const result = andPublish
       ? await publishNow(initialData.id, content)
@@ -268,15 +303,33 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
 
     if (!result.ok) {
       alert(result.error)
+      gate.endSave()
       setSaving(false)
       router.refresh()
       return
     }
 
     localStorage.removeItem(storageKey)
+    const warning = andPublish ? (result.data as { imageWarning?: string } | undefined)?.imageWarning : undefined
+    if (warning) {
+      // Live, but an image is still private: stay here and offer the retry.
+      setImageWarning(warning)
+      setSavedSnapshot(snapshot(content))
+      gate.endSave()
+      setSaving(false)
+      router.refresh()
+      return
+    }
     leaving.current = true
     router.push(andPublish ? '/admin/posts' : '/admin/staging')
     router.refresh()
+  }
+
+  async function handleMakeImagesPublic() {
+    if (!initialData?.id) return
+    const result = await promotePostImages(initialData.id)
+    if (result.ok) setImageWarning(null)
+    else alert(result.error)
   }
 
   function handleAIGenerated(data: {
@@ -349,7 +402,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
           >
             Cancel
           </button>
-          {isLive ? (
+          {viaStaging ? (
             <>
               <button
                 type="button"
@@ -365,7 +418,7 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
                 disabled={saving}
                 className="btn-primary px-5 py-2 text-sm font-bold disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Publish now'}
+                {saving ? 'Saving...' : isScheduled ? 'Apply to scheduled post' : 'Publish now'}
               </button>
             </>
           ) : staged ? (
@@ -404,6 +457,15 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
         </div>
       </div>
 
+      {imageWarning && (
+        <div role="alert" className="mb-4 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm text-text-secondary">{imageWarning}</span>
+          <button type="button" onClick={handleMakeImagesPublic} className="text-sm font-bold text-accent hover:underline">
+            Make images public
+          </button>
+        </div>
+      )}
+
       {staged && (
         <div className="mb-4 p-3 rounded-lg border border-accent/30 bg-accent/5 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm text-text-secondary">
@@ -416,17 +478,22 @@ export default function PostForm({ initialData, staged = null }: PostFormProps) 
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
         <PostEditor content={body} onChange={setBody} key={editorKey} />
-        <PostMetaSidebar
-          meta={meta}
-          onChange={setMeta}
-          statusLockedNote={
-            isLive
-              ? 'Live. To take it down, use the status badge on the posts list.'
-              : staged
-                ? 'Staged. Publish it from Staging, or discard the staged copy to change the status here.'
-                : undefined
-          }
-        />
+        <div className="space-y-6">
+          <PostMetaSidebar
+            meta={meta}
+            onChange={setMeta}
+            statusLockedNote={
+              isLive
+                ? 'Live. To take it down, use the status badge on the posts list, or set a take-down time below.'
+                : isScheduled
+                  ? 'Scheduled. Change its dates below; content edits go through the staged copy.'
+                  : staged
+                    ? 'Staged. Publish it from Staging, or discard the staged copy to change the status here.'
+                    : undefined
+            }
+          />
+          {children}
+        </div>
       </div>
 
       {/* AI Generate Modal */}
