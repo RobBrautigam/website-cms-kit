@@ -279,10 +279,30 @@
     db.posts.forEach(function (p) {
       if (p.status === 'scheduled' && p.publishAt && new Date(p.publishAt) <= new Date()) {
         p.status = 'published'; p.live = clone(p.draft); p.publishedAt = p.publishAt; p.publishAt = null; changed = true;
+        keepRevision(p, 'the scheduler');
         db.audit.unshift({ id: uid(), at: nowIso(), actor: 'scheduler', role: 'system', action: 'blog_post.scheduled_publish', resourceType: 'blog_post', resourceId: p.id, payload: { title: p.draft.title }, ip: '' });
+      }
+      // 1.4.0: a post with an end date comes down at that time (run_scheduled_publishing()).
+      if (p.unpublishAt && new Date(p.unpublishAt) <= new Date() && (p.status === 'published' || p.status === 'scheduled')) {
+        p.status = 'draft'; p.live = null; p.review = null; p.publishAt = null; p.unpublishAt = null; changed = true;
+        db.audit.unshift({ id: uid(), at: nowIso(), actor: 'scheduler', role: 'system', action: 'blog_post.scheduled_unpublish', resourceType: 'blog_post', resourceId: p.id, payload: { title: p.draft.title }, ip: '' });
       }
     });
     if (changed) save();
+  }
+
+  // 1.4.0 revisions: every time a post's live version changes, the kit's
+  // trigger keeps a copy with who, when and which fields changed (latest 100).
+  function localInput(iso) {
+    var d = new Date(iso); var pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function keepRevision(p, by) {
+    p.revisions = p.revisions || [];
+    var prev = p.revisions[0];
+    var changedFields = prev ? Object.keys(p.live).filter(function (k) { return !same(p.live[k], prev.content[k]); }) : [];
+    p.revisions.unshift({ id: uid(), at: nowIso(), by: by, content: clone(p.live), changed: changedFields });
+    if (p.revisions.length > 100) p.revisions.length = 100;
   }
 
   // -------------------------------------------------------- post helpers
@@ -349,6 +369,7 @@
   function publishPost(p, how, batch) {
     var r = reviewOf(p), wasLive = p.status === 'published' && p.publishedAt;
     p.live = clone(p.draft); p.status = 'published'; p.publishAt = null; if (!wasLive) p.publishedAt = nowIso(); p.updatedAt = nowIso();
+    keepRevision(p, me().name);
     if (r) audit('blog_post.publish_staged', 'blog_post', p.id, { title: p.draft.title, slug: p.draft.slug, review_status: r.status, approved_by: r.approvedBy, batch: batch || 1 });
     else audit(how || 'blog_post.publish', 'blog_post', p.id, { title: p.draft.title });
     p.review = null;
@@ -1131,6 +1152,22 @@
       if (s === 'published' || s === 'changed') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-unpublish">Unpublish</button>';
       if (s === 'scheduled') box += '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-unschedule">Back to draft</button>';
       box += '</div></div>';
+      if (s === 'published' || s === 'changed' || s === 'scheduled') {
+        box += '<div class="field mt-8"><label class="lbl" for="ed-unpub">Comes down at <span class="tag-new">New in 1.4.0</span></label>' +
+          '<div class="row"><input class="input" id="ed-unpub" type="datetime-local" value="' + esc(p.unpublishAt ? localInput(p.unpublishAt) : '') + '">' +
+          '<button type="button" class="btn btn-outline btn-sm" data-act="ed-unpub-save">Save</button></div>' +
+          '<p class="hint">At this time the post goes back to draft on its own. Leave it empty to keep it up.</p></div>';
+      }
+      var revs = p.revisions || [];
+      if (s === 'published' || s === 'changed' || s === 'scheduled' || revs.length) {
+        box += '<div class="mt-8"><h3 class="lbl">Revisions <span class="tag-new">New in 1.4.0</span></h3>' +
+          (revs.length ? '<ol class="plain-list">' + revs.slice(0, 10).map(function (v) {
+            return '<li class="row"><span class="hint">' + esc(dateTimeLabel(v.at)) + ' by ' + esc(v.by) +
+              (v.changed.length ? '. Changed: ' + esc(v.changed.join(', ')) : '') + '</span>' +
+              '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-restore" data-rev="' + esc(v.id) + '"' + (r ? ' disabled title="Publish or discard the staged change first."' : '') + '>Restore</button></li>';
+          }).join('') + '</ol>' : '<p class="hint">Each publish of this post keeps one. Restore puts that version into a staged change, which goes live the way any edit does.</p>') +
+          '</div>';
+      }
       $('#pub-box').innerHTML = box;
       $('#ed-actions').innerHTML = p._unsaved ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-act="ed-delete">' + icon('trash') + 'Delete</button>';
     }
@@ -1172,6 +1209,21 @@
         confirmDialog({ title: 'Discard your changes?', desc: 'The staged copy is deleted. The post goes back to the version that is live now.', confirm: 'Discard changes', danger: true, onConfirm: function () { discardStage(p); save(); toast('Changes discarded.'); render(true); } });
       } else if (act === 'ed-unpublish') {
         confirmDialog({ title: 'Unpublish this post?', desc: 'It comes off the public site and stays here as a draft.', confirm: 'Unpublish', onConfirm: function () { p.live = null; p.status = 'draft'; p.review = null; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Moved to drafts.'); renderPub(); refreshBadges(); } });
+      } else if (act === 'ed-unpub-save') {
+        var v = $('#ed-unpub').value;
+        var at = v ? new Date(v) : null;
+        if (at && isNaN(at.getTime())) { toast('Pick a valid date and time.', 'err'); return; }
+        if (at && p.status === 'scheduled' && p.publishAt && at <= new Date(p.publishAt)) { toast('The end date must be after the publish date.', 'err'); return; }
+        p.unpublishAt = at ? at.toISOString() : null; p.updatedAt = nowIso();
+        audit('blog_post.schedule_update', 'blog_post', p.id, { title: p.draft.title, unpublish_at: p.unpublishAt });
+        save(); toast(at ? 'It comes down ' + dateTimeLabel(p.unpublishAt) + '.' : 'End date cleared.'); renderPub();
+      } else if (act === 'ed-restore') {
+        var rev = (p.revisions || []).filter(function (x) { return x.id === b.getAttribute('data-rev'); })[0];
+        if (!rev) return;
+        if (reviewOf(p)) { toast('This post already has a staged change. Publish or discard it first, then restore.', 'err'); return; }
+        p.draft = clone(rev.content); p.updatedAt = nowIso();
+        audit('blog_post.restore_revision', 'blog_post', p.id, { title: rev.content.title });
+        save(); toast('Restored into a staged change. Publish it when you are ready.'); render(true);
       } else if (act === 'ed-unschedule') {
         p.status = 'draft'; p.publishAt = null; p.updatedAt = nowIso(); audit('blog_post.unschedule', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Back to draft.'); renderPub(); refreshBadges();
       } else if (act === 'ed-delete') {
@@ -1698,6 +1750,11 @@
           'Security headers on every page, and a Content Security Policy on the admin that reports problems until you switch it to enforce.',
           'Every form and button that changes data refuses a request sent from another site.',
           'Writing help from AI is limited per admin (20 calls in 10 minutes by default), and what it returns is checked before the editor sees it.',
+          'New in 1.4.0: with mandatory review on, the two-person lock covers images and redirects too. A new or changed redirect waits switched off until a teammate turns it on, and staged images can only be written once.',
+          'New in 1.4.0: a daily AI cap per admin (100 calls), a spend record for every AI call, and the request checked before any budget is spent.',
+          'New in 1.4.0: password re-checks and recovery codes are limited per admin, and each failed try is in the audit log.',
+          'New in 1.4.0: images go public only after their post is published, through a ledger that refuses a public file the kit did not put there.',
+          'New in 1.4.0: a scheduler in the database (Supabase Cron) publishes scheduled posts and takes posts down at their end date, every minute.',
           'The redirect counter is limited per visitor and per redirect, so nobody can inflate it.',
           'The audit log is append-only: the database refuses edits and deletes, apart from clearing entries older than the retention window (24 months by default).',
           'Images uploaded for a post stay private until the post goes live.',

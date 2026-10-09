@@ -2,6 +2,38 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.4.0 (2026-10-08)
+
+Revisions, scheduled publishing, and the fixes the 1.3.0 review left open. Run `003_revisions_and_scheduling.sql` after 002. Full detail in [docs/12](docs/12-revisions-and-scheduling.md).
+
+### Added
+
+- **Revisions.** Every save of a live or scheduled post keeps a revision (who, when, which fields changed), by trigger, so the editor, Staging, bulk actions, the Data API and the scheduler are all kept; the latest 100 per post. Admins read them; nobody writes them by hand.
+- **Restore through staging.** The edit screen lists a post's revisions; Restore puts that version into the staged copy, so it goes live the way any edit does, review included.
+- **Scheduled publish and take-down.** A scheduled post is visible from its date (it never was before: nothing changed its status) and `run_scheduled_publishing()` marks it published; any live or scheduled post can have an end date ("Comes down at"). Supabase Cron runs it every minute when pg_cron is enabled; the host's scheduler can call it instead. Each change keeps a revision and an audit row.
+- **A Schedule panel** on live and scheduled posts, and the date fields say they are UTC (they were read in the browser's zone and saved as UTC, which moved a date on every save).
+- **Staged image cleanup** in Settings (super admin): unused staged images older than 48 hours are removed, with an audit row.
+- **A kit-local type-check** (`source/typecheck/`) against the Next.js 16.4 types, with no borrowed `node_modules`.
+- `docs/12-revisions-and-scheduling.md`, and 47 more tests (180 in all): migration 003 on PGlite, the new route and action behavior against stand-ins, and the new helpers, each seen failing first.
+
+### Security
+
+- **The two-person lock is whole.** With review required: no admin writes to the public image bucket, staged images are write-once, and a new or changed redirect waits switched off until a teammate turns it on (the database records who changed it). A scheduled post's edits take the staged path, so the lock no longer blocks editing it, and pushing its date later or setting an end date stays free.
+- **Images go public only after the publish write succeeds,** everywhere a post goes live, through a ledger of what the kit promoted: a file somebody put in the public bucket directly is refused, not adopted. A post that went live with an image still private says so and offers Make images public.
+- **The redirect counter and the audit log key on the address the trusted proxy wrote** (`TRUSTED_PROXY_HOPS`), never the visitor's first `X-Forwarded-For` entry.
+- **Password re-checks and recovery codes are limited per admin** (5 tries in 15 minutes each), and every wrong password, wrong code and limited try writes an audit row.
+- **The AI routes:** the request is checked before any budget is spent, the inputs refuse unknown keys, a daily cap per admin (100 calls) sits behind the ten-minute limit, and every call leaves a spend record (`ai_usage`) with its token counts; no record, no call.
+- **Review fixes before release:** a promoted image is never copied again, so deleting a public file and uploading a new one at its staged path cannot swap it; bringing back a post past its end date needs approval; a post that goes back to draft loses its end date on every path; revisions outlive a deleted post; a redirect with no recorded changer waits for an edit and a teammate; posts promote images from the row as written; an AI call the API refused is marked `refused`; the audit log no longer reads `cf-connecting-ip`.
+- **Live-post autosave is quiet and never resets a review:** it writes only a staged copy nobody has sent for review, and audits only the one that creates the copy. An explicit save waits for an autosave in flight.
+- **HSTS defaults to `max-age` alone;** `HSTS_PRELOAD=1` adds `includeSubDomains; preload` (docs/09).
+- **Session lifetime and idle timeout chosen and documented** (docs/09): a 12-hour time-box, a 2-hour idle timeout, a one-hour access token.
+
+### Changed
+
+- `APP_VERSION` reads `v1.4.0`.
+- The 100 em dashes left in 52 older files are gone.
+- SECURITY.md's known limitations: four closed, three added (the scheduler, the session settings, scheduled images).
+
 ## 1.3.0 (2026-10-08)
 
 Hardening and everyday comforts. Run `002_hardening.sql` after 001. Full detail in [docs/11](docs/11-hardening-and-everyday-comforts.md).

@@ -4,7 +4,7 @@ import { crossSiteRefusal } from "@/lib/security/request-origin";
 
 // Initiates MFA enrollment; the audit row is written by the verify-enroll
 // route once the user proves possession of the new factor.
-// audit:exempt — enrollment kickoff is read-only-ish; verify-enroll audits.
+// audit:exempt - enrollment kickoff is read-only-ish; verify-enroll audits.
 export async function POST(request: Request) {
   const refused = crossSiteRefusal(request);
   if (refused) return refused;

@@ -111,8 +111,8 @@ export async function getBlogSlugs(): Promise<string[]> {
 
 /**
  * Minimal blog data for the sitemap: `slug` + `featured_image_url` only.
- * Deliberately narrow (NOT `select('*')`) so crawler hits — which can fire
- * every revalidate window — never pull full post bodies just to emit URLs +
+ * Deliberately narrow (NOT `select('*')`) so crawler hits - which can fire
+ * every revalidate window - never pull full post bodies just to emit URLs +
  * image entries. Throws on error so the sitemap's own try/catch can fall back
  * to a slug-only path (the wrapper that swallows errors must not be used here).
  */

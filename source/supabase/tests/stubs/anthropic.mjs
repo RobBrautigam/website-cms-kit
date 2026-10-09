@@ -6,7 +6,8 @@ export default class Anthropic {
   messages = {
     create: async () => {
       calls.anthropic++
-      return { content: [{ type: 'text', text: fakes.modelText }] }
+      if (fakes.modelError) throw fakes.modelError
+      return { content: [{ type: 'text', text: fakes.modelText }], usage: { input_tokens: 120, output_tokens: 45 } }
     },
   }
 }

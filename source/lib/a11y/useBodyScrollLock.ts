@@ -5,7 +5,7 @@ let priorOverflow: string | null = null
 
 /**
  * Locks `document.body` scroll while `active` is true. Stacks safely across
- * multiple consumers via reference counting — the first lock captures the
+ * multiple consumers via reference counting - the first lock captures the
  * existing `overflow` value, the last unlock restores it.
  *
  * Client-side only. Must be called from a `'use client'` component because it

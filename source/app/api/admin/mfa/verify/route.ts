@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/mfa";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { crossSiteRefusal } from "@/lib/security/request-origin";
+import { recoveryCodeRefusal } from "@/lib/auth/reauth-guard";
 
 export async function POST(req: Request) {
   const refused = crossSiteRefusal(req);
@@ -34,16 +35,21 @@ export async function POST(req: Request) {
     // session. If we just returned ok the user would bounce off requireAdmin's
     // aal2 gate back to this page, burning one single-use code per loop. Instead:
     // claim the code, unenroll the user's factor(s) so nextLevel drops to aal1,
-    // then send them to re-enroll.
+    // then send them to re-enroll. Attempts are limited per admin and a wrong
+    // code is audited (lib/auth/reauth-guard.ts), so a session that got past
+    // the password cannot work through guesses unseen.
+    const limited = await recoveryCodeRefusal(user.id);
+    if (limited) return limited;
     const codeRowId = await findUnusedRecoveryCodeId(user.id, code);
     if (!codeRowId) {
+      await recordAdminAction({ action: "auth.mfa.recovery_code_failed" });
       return Response.json({ error: "Invalid recovery code" }, { status: 400 });
     }
 
     // Claim the code atomically BEFORE the irreversible factor delete. This keeps
     // single-use honest: only one concurrent request can win, and we never report
     // success / audit a code we didn't actually mark used. A lost claim (race or
-    // DB error) means the code is not ours to spend — nothing was unenrolled.
+    // DB error) means the code is not ours to spend - nothing was unenrolled.
     const claimed = await consumeRecoveryCodeById(codeRowId);
     if (!claimed) {
       return Response.json({ error: "Invalid recovery code" }, { status: 400 });
@@ -62,7 +68,7 @@ export async function POST(req: Request) {
 
     // Full success, OR a partial unenroll (some factors deleted before a later
     // delete failed): MFA state is mutated, so the recovery code is legitimately
-    // spent — do NOT release it. Record the spend, flagging partial failures so
+    // spent - do NOT release it. Record the spend, flagging partial failures so
     // operators can reconcile the user's MFA state, then drive them to re-enroll.
     await recordAdminAction({
       action: "auth.mfa.recovery_code_used",

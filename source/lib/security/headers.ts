@@ -20,10 +20,19 @@
  * report them, which is why enforcing is a deliberate step.
  */
 
+/**
+ * HTTPS only, for two years. Harmless on localhost (browsers ignore it over
+ * plain HTTP). Subdomains and the browsers' preload list are opt-in with
+ * HSTS_PRELOAD=1, because both reach past this app: every subdomain of the
+ * domain must then serve HTTPS, and leaving the preload list takes months
+ * (docs/09).
+ */
+export function hstsValue(env: Record<string, string | undefined> = process.env): string {
+  return env.HSTS_PRELOAD === '1' ? 'max-age=63072000; includeSubDomains; preload' : 'max-age=63072000'
+}
+
 export const SECURITY_HEADERS: { key: string; value: string }[] = [
-  // HTTPS only, for two years, subdomains included. Harmless on localhost
-  // (browsers ignore it over plain HTTP).
-  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'Strict-Transport-Security', value: hstsValue() },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   // No framing anywhere (clickjacking). frame-ancestors in the CSP says the

@@ -1,5 +1,5 @@
 /*
- * Website CMS Kit — design tokens + component classes (Tailwind v4).
+ * Website CMS Kit - design tokens + component classes (Tailwind v4).
  *
  * The admin components reference SEMANTIC token classes (bg-bg-card,
  * text-text-primary, text-accent, border-border, btn-primary, ...) rather than
@@ -39,7 +39,7 @@
   --text-on-dark: #f8fafc;
   --text-on-dark-secondary: #cbd5e1;
 
-  /* Accent (single chromatic accent — swap to your brand color) */
+  /* Accent (single chromatic accent - swap to your brand color) */
   --accent: #2563eb;
   --accent-end: #1d4ed8;
   --accent-warm: #2563eb;

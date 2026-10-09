@@ -31,7 +31,7 @@ function Chip({ children, tone = "default" }: { children: React.ReactNode; tone?
 }
 
 function relativeTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const then = new Date(iso).getTime();
   const diff = Date.now() - then;
   const m = 60_000, h = 60 * m, d = 24 * h;
@@ -170,7 +170,7 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
                   {r.permanent ? <Chip>308</Chip> : <Chip tone="warning">307</Chip>}
                 </td>
                 <td className="px-3 py-3">
-                  {r.category ? <Chip>{r.category}</Chip> : <span className="text-text-muted">—</span>}
+                  {r.category ? <Chip>{r.category}</Chip> : <span className="text-text-muted">-</span>}
                 </td>
                 <td className="px-3 py-3 text-right tabular-nums">{r.hit_count.toLocaleString()}</td>
                 <td className="px-3 py-3 text-xs text-text-secondary">{relativeTime(r.last_access)}</td>
@@ -226,7 +226,7 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-text-secondary/70 font-semibold mb-1">Category</p>
-                {r.category ? <Chip>{r.category}</Chip> : <span className="text-text-muted text-xs">—</span>}
+                {r.category ? <Chip>{r.category}</Chip> : <span className="text-text-muted text-xs">-</span>}
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-text-secondary/70 font-semibold">Hits</p>

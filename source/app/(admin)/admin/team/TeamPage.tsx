@@ -17,7 +17,7 @@ export default function TeamPage({
   // NOTE: members is read directly from the prop. router.refresh() re-runs
   // the server component which passes a new prop, and React re-renders
   // automatically. An earlier version stored members in useState and never
-  // saw the new prop value — that swallowed every post-action refresh.
+  // saw the new prop value - that swallowed every post-action refresh.
   const [showInvite, setShowInvite] = useState(false)
   const [isRefreshing, startTransition] = useTransition()
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)

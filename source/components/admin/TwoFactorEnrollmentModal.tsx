@@ -155,7 +155,7 @@ export function TwoFactorEnrollmentModal({
             onClick={() => setStep("verify")}
             className="w-full rounded-lg bg-text-primary px-4 py-2 text-sm font-medium text-white"
           >
-            I&apos;ve scanned it — Continue
+            I&apos;ve scanned it - Continue
           </button>
         </div>
       )}
@@ -232,7 +232,7 @@ export function TwoFactorEnrollmentModal({
             }}
             className="w-full rounded-lg bg-text-primary px-4 py-2 text-sm font-medium text-white"
           >
-            I&apos;ve saved these — Continue
+            I&apos;ve saved these - Continue
           </button>
         </div>
       )}

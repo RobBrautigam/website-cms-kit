@@ -123,7 +123,7 @@ export default function TeamMemberRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 flex-wrap">
           <p className="font-semibold text-sm text-text-primary truncate">
-            {member.name || '—'}
+            {member.name || '-'}
             {isCurrentUser && (
               <span className="ml-2 text-[10px] uppercase tracking-wider text-text-secondary/60 font-normal">
                 you

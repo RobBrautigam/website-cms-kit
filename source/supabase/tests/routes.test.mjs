@@ -34,7 +34,8 @@ test('new recovery codes need the password: none is a 400, a wrong one a 401, an
   const wrong = await POST(post('/api/admin/mfa/regenerate-codes', { password: 'guess' }))
   assert.equal(wrong.status, 401)
   assert.equal(calls.regenerate, 0)
-  assert.deepEqual(calls.audit, [])
+  // 1.4.0: the failed re-check is on the record (it was silent before).
+  assert.deepEqual(calls.audit, ['auth.reauth_failed'])
 })
 
 test('new recovery codes with the right password: the codes come back and the action is audited', async () => {
@@ -134,7 +135,8 @@ test('the redirect beacon counts through the limited function on the service rol
     const id = '30000000-0000-4000-8000-000000000001'
     const req = new Request(`${SITE}/api/redirects/hit/${id}`, {
       method: 'POST',
-      headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.2', 'user-agent': 'Mozilla/5.0' },
+      // The visitor wrote the first entry; the host's proxy appended the last.
+      headers: { 'x-forwarded-for': '6.6.6.6, 203.0.113.9', 'user-agent': 'Mozilla/5.0' },
     })
     const res = await POST(req, { params: Promise.resolve({ id }) })
     assert.equal(res.status, 204)
@@ -162,6 +164,7 @@ test('the redirect beacon counts through the limited function on the service rol
 const IMG = (path) => `https://proj.supabase.example/storage/v1/object/public/blog-images/${path}`
 const A = 'blog/0a1b2c3d4e5f.png'
 const B = 'blog/11112222-3333-4444-5555-666677778888.webp'
+const POST_ID = '10000000-0000-4000-8000-000000000001'
 
 test('going live makes the post\'s staged images public and clears the staged copies', async () => {
   const { promoteImages } = await import('../../lib/staging/promote-images.ts')
@@ -170,7 +173,7 @@ test('going live makes the post\'s staged images public and clears the staged co
   const failed = await promoteImages({
     featured_image_url: IMG(A),
     body: { type: 'doc', content: [{ type: 'image', attrs: { src: IMG(B), alt: 'x' } }] },
-  })
+  }, POST_ID)
   assert.equal(failed, null)
   assert.deepEqual([...fakes.storage.public].sort(), [A, B].sort())
   assert.equal(fakes.storage.staged.size, 0)
@@ -179,9 +182,9 @@ test('going live makes the post\'s staged images public and clears the staged co
 test('an image already public (or from before 1.3.0) is skipped; a real storage failure stops the publish', async () => {
   const { promoteImages } = await import('../../lib/staging/promote-images.ts')
   fakes.storage.public.add(A)
-  assert.equal(await promoteImages({ featured_image_url: IMG(A) }), null)
+  assert.equal(await promoteImages({ featured_image_url: IMG(A) }, POST_ID), null)
   fakes.storage.staged.add(B)
   fakes.storage.failCopy = 'Service unavailable'
-  assert.match(await promoteImages({ featured_image_url: IMG(B) }), /could not be made public/)
+  assert.match(await promoteImages({ featured_image_url: IMG(B) }, POST_ID), /could not be made public/)
   assert.equal(fakes.storage.public.has(B), false)
 })

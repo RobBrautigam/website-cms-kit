@@ -38,6 +38,7 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 - **Staging and approval.** Edits to a live post wait in a private staged copy until someone publishes them; ask a teammate to review, approve (never your own change), compare live and staged, preview the whole site with every staged change, and publish the ones you pick together. See [below](#staging-and-approval).
 - **Audit log.** An append-only record of every sensitive change (a database trigger refuses edits and deletes), with a filterable viewer and CSV export.
 - **Hardened by default (1.3.0).** Security headers and a report-only Content Security Policy, one same-site check on every state-changing route, per-admin limits and output schemas on the AI routes, a server-only redirect counter, new recovery codes behind the password, private images until publish, and an opt-in database lock that puts post content and status under two-person control. See [docs/11](docs/11-hardening-and-everyday-comforts.md).
+- **Revisions and scheduled publishing (1.4.0).** Every save of a live or scheduled post keeps a revision (who, when, what changed) with a restore that goes through staging; scheduled posts go live on time and any post can come down at an end date, run by Supabase Cron in the database. The two-person lock now covers images and redirects too. See [docs/12](docs/12-revisions-and-scheduling.md).
 - **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post.
 - **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
 - **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system you re-theme in one file, and Supabase Storage image upload guarded by Storage RLS.
@@ -84,7 +85,7 @@ flowchart LR
 
 - **A copy, never an overwrite.** One staged copy per post, in its own table. A brand-new draft can be staged too, so it goes through the same review.
 - **Two people for an approval.** Nobody approves their own change, and editing an approved change sends it back to staged. The database enforces this with a trigger, whatever client writes the row. A change in review cannot be published while it stays in review; any admin can withdraw the request, and the audit log records who did.
-- **Review is optional by default.** Any admin can still publish a staged change straight away. One switch in the migration and one constant make review mandatory; since 1.3.0 the same switch also turns on a database lock, so no post's content or status reaches the public site, through the screens or the Data API, without a second admin's approval (images, redirects and the other tables are outside the lock) ([docs/11](docs/11-hardening-and-everyday-comforts.md#the-opt-in-two-person-lock)).
+- **Review is optional by default.** Any admin can still publish a staged change straight away. One switch in the migration and one constant make review mandatory; since 1.3.0 the same switch also turns on a database lock, so no post's content or status reaches the public site, through the screens or the Data API, without a second admin's approval ([docs/11](docs/11-hardening-and-everyday-comforts.md#the-opt-in-two-person-lock)); since 1.4.0 it covers image files and redirects too ([docs/12](docs/12-revisions-and-scheduling.md)).
 - **Publish the ones you pick.** The Staging page publishes a selection in one transaction: all of them or none.
 - **The public site cannot read a staged row.** The public key has no grant and no policy on the table, and the public data layer never queries it. The preview reads staged rows only for a signed-in admin, through Next.js draft mode turned on by a form posted from the admin. Images uploaded while editing stay in a private bucket until their post goes live.
 - **Every step is in the audit log:** staged, review requested, approved, withdrawn, discarded, published, and preview turned on.
@@ -101,7 +102,7 @@ npm install
 npm test
 ```
 
-The tests load all three migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits and schemas, the redirect counter and image promotion. 133 tests in all.
+The tests load all four migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave and restoring a revision. 180 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 
@@ -137,6 +138,7 @@ website-cms-kit/
 | [09-environment-and-deploy.md](docs/09-environment-and-deploy.md) | Env vars (both Supabase key generations), Supabase config, dependency classification, deploy. |
 | [10-staging-and-approval.md](docs/10-staging-and-approval.md) | Staged copies of live posts, review and approval, the whole-site preview, publish-selected, and the tests. |
 | [11-hardening-and-everyday-comforts.md](docs/11-hardening-and-everyday-comforts.md) | 1.3.0: headers and CSP, the same-site check, rate limits, AI output schemas, the append-only audit trigger, the two-person lock, private staged images, and the editor and posts-list comforts. |
+| [12-revisions-and-scheduling.md](docs/12-revisions-and-scheduling.md) | 1.4.0: revisions and restore, scheduled publish and take-down, running the scheduler (Supabase Cron or the host's), and the lock on images and redirects. |
 
 ## Tech stack
 

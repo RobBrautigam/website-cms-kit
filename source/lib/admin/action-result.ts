@@ -56,7 +56,7 @@ export function wrapSupabaseError(
     return err("Cannot delete: still referenced elsewhere.", "conflict");
   }
   if (error.code === "42501") {
-    // Postgres "permission denied" — almost always Supabase RLS rejecting an
+    // Postgres "permission denied" - almost always Supabase RLS rejecting an
     // expired/downgraded session. Surface as `unauthorized` so the call site
     // can decide whether to redirect to login or just toast. Without this
     // branch, RLS denials surface as raw error text and confuse the user.

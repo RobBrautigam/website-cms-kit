@@ -1,7 +1,7 @@
 // Security headers and the Content Security Policy.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { SECURITY_HEADERS, buildCsp, cspEnforced, cspHeaderName, newNonce } from './headers.ts'
+import { SECURITY_HEADERS, buildCsp, cspEnforced, cspHeaderName, hstsValue, newNonce } from './headers.ts'
 import nextConfig from '../../next.config.ts'
 
 const header = (key) => SECURITY_HEADERS.find((h) => h.key === key)?.value
@@ -83,4 +83,11 @@ test('the per-request policy covers /admin by default and the whole site only on
   assert.equal(fwd.get('content-security-policy-report-only'), admin.value)
   assert.equal(fwd.get('x-nonce'), admin.nonce)
   assert.equal(forwardWithCsp(new Headers({ a: '1' }), null).get('x-nonce'), null)
+})
+
+test('HSTS defaults to max-age alone; subdomains and preload are an opt-in', () => {
+  assert.equal(SECURITY_HEADERS.find((h) => h.key === 'Strict-Transport-Security').value, 'max-age=63072000')
+  assert.equal(hstsValue({}), 'max-age=63072000')
+  assert.equal(hstsValue({ HSTS_PRELOAD: '1' }), 'max-age=63072000; includeSubDomains; preload')
+  assert.equal(hstsValue({ HSTS_PRELOAD: 'yes' }), 'max-age=63072000')
 })

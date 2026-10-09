@@ -12,7 +12,7 @@ export interface RequireResult {
 /**
  * Internal: resolve the user + admin role for the current request, redirecting
  * unauthenticated / non-admin / deactivated users to the login page. Does NOT
- * enforce MFA — used as the shared base for both requireAdmin (MFA-gated) and
+ * enforce MFA - used as the shared base for both requireAdmin (MFA-gated) and
  * requirePartialAdmin (MFA-flow pages that must be reachable pre-AAL2).
  */
 async function resolveAdmin(): Promise<RequireResult> {
@@ -89,7 +89,7 @@ export async function requireAdmin(): Promise<RequireResult> {
  *
  * This separation exists so the MFA pages can authenticate the user without
  * infinite-redirecting through their own gate. The user is still required to
- * complete the flow before they can reach any other admin surface — that's
+ * complete the flow before they can reach any other admin surface - that's
  * enforced by requireAdmin everywhere else.
  *
  * Use this ONLY for routes that are part of the MFA challenge / enrollment
@@ -115,7 +115,7 @@ export async function requireSuperAdmin(): Promise<RequireResult> {
 
 /**
  * Read-only variant: returns the role for the current request without
- * redirecting. Use sparingly — UI code should rely on the role passed down
+ * redirecting. Use sparingly - UI code should rely on the role passed down
  * from the layout, not call this in nested components.
  *
  * Returns null if no user, no row, deactivated, or non-admin role.

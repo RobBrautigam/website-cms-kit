@@ -9,7 +9,7 @@ const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30
 
 function logLoginSuccess() {
   // Fire-and-forget. The endpoint requires a valid session, which is
-  // already set at this point — that's what proves the login succeeded
+  // already set at this point - that's what proves the login succeeded
   // and prevents anonymous callers from forging audit rows.
   // Failed-login attempts are recorded by Supabase's native
   // auth.audit_log_entries table; we don't post anything for failures.
@@ -44,7 +44,7 @@ export default function LoginForm() {
 
     if (error) {
       // Failures are recorded by Supabase's native auth.audit_log_entries
-      // table. Do NOT make an authenticated network call here — there's no
+      // table. Do NOT make an authenticated network call here - there's no
       // session and the endpoint would (correctly) reject anonymous callers.
       setError(error.message)
       setLoading(false)

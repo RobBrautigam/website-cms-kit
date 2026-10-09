@@ -30,7 +30,12 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
   {
     label: "Staging and approval",
     actions:
-      "blog_post.stage,blog_post.request_review,blog_post.approve,blog_post.withdraw_review,blog_post.discard_staged,blog_post.publish_staged,staging.preview_enabled",
+      "blog_post.stage,blog_post.request_review,blog_post.approve,blog_post.withdraw_review,blog_post.discard_staged,blog_post.publish_staged,staging.preview_enabled,blog_post.images_promoted,staging.orphans_cleaned",
+  },
+  {
+    label: "Revisions and scheduling",
+    actions:
+      "blog_post.restore_revision,blog_post.schedule_update,blog_post.scheduled_publish,blog_post.scheduled_unpublish",
   },
   { label: "Jobs", actions: "job.create,job.update,job.delete" },
   {
@@ -52,6 +57,11 @@ const ACTION_GROUPS: { label: string; actions: string }[] = [
     label: "MFA events",
     actions:
       "auth.mfa.enrolled,auth.mfa.verified,auth.mfa.recovery_code_used,auth.mfa.disabled,auth.mfa.regenerated_codes,auth.mfa.reset_by_operator",
+  },
+  {
+    label: "Failed or limited re-checks",
+    actions:
+      "auth.reauth_failed,auth.reauth_limited,auth.mfa.recovery_code_failed,auth.mfa.recovery_limited",
   },
   { label: "Audit log exports", actions: "audit_log.export_csv" },
 ];
@@ -264,16 +274,16 @@ export function AuditLogView({ initial, initialFilters, pageSize }: Props) {
                     <td className="px-3 py-3">
                       <div className="text-text-primary">{r.actor_email}</div>
                       <div className="text-xs text-text-muted">
-                        {r.actor_role ?? "—"}
+                        {r.actor_role ?? "-"}
                       </div>
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">{r.action}</td>
                     <td className="px-3 py-3 text-xs">
-                      {r.resource_type ?? "—"}
+                      {r.resource_type ?? "-"}
                       {r.resource_id ? ` · ${r.resource_id.slice(0, 8)}` : ""}
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">
-                      {r.ip_address ?? "—"}
+                      {r.ip_address ?? "-"}
                     </td>
                   </tr>
                   {isOpen && (
@@ -319,11 +329,11 @@ export function AuditLogView({ initial, initialFilters, pageSize }: Props) {
                 </span>
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                {r.actor_role ?? "—"} ·{" "}
+                {r.actor_role ?? "-"} ·{" "}
                 <span className="font-mono">{r.action}</span>
               </div>
               <div className="text-xs text-text-muted mt-1">
-                {r.resource_type ?? "—"}
+                {r.resource_type ?? "-"}
                 {r.resource_id ? ` · ${r.resource_id.slice(0, 8)}` : ""}
               </div>
               {isOpen && (

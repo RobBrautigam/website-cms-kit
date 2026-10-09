@@ -21,7 +21,15 @@ export async function consumeRateLimit(bucket: string, caller: string, max: numb
   return data === true
 }
 
-/** One AI call for this admin (all three AI routes share the budget). */
-export function consumeAiCall(userId: string): Promise<boolean> {
-  return consumeRateLimit('ai', userId, RATE_LIMITS.ai.max, RATE_LIMITS.ai.windowSeconds)
+/**
+ * One AI call for this admin (all three AI routes share the budget): the
+ * ten-minute limit, then the daily cap. True means go ahead; false means the
+ * ten-minute limit is spent; a number is the daily cap's retry-after, in
+ * seconds. The daily window is not spent when the ten-minute one refuses.
+ */
+export async function consumeAiCall(userId: string): Promise<boolean | number> {
+  const { ai, aiDaily } = RATE_LIMITS
+  if (!(await consumeRateLimit('ai', userId, ai.max, ai.windowSeconds))) return false
+  if (!(await consumeRateLimit('ai_daily', userId, aiDaily.max, aiDaily.windowSeconds))) return aiDaily.windowSeconds
+  return true
 }

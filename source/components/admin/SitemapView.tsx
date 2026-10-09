@@ -110,7 +110,7 @@ function pruneTree(node: TreeNode, query: string): TreeNode | null {
 }
 
 // All sections share the same neutral chip style. Section identity comes from
-// the section heading + path label, not chip hue — a single tonal variant
+// the section heading + path label, not chip hue - a single tonal variant
 // reads cleaner than a per-section rainbow. Swap to your own brand tokens if
 // you want color-coded sections.
 const NEUTRAL_CHIP = {

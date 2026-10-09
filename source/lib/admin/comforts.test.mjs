@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { altTextRefusal, bodyImagesMissingAlt } from './alt-text.ts'
 import { searchPreview, socialPreview, clip } from './previews.ts'
-import { AUTOSAVE_DELAY_MS, autosaveLabel, autosaveTarget, isDirty, snapshot } from './autosave.ts'
+import { AUTOSAVE_DELAY_MS, autosaveLabel, autosaveTarget, createSaveGate, isDirty, snapshot } from './autosave.ts'
 import { MAX_BULK, bulkSummary, isBulkAction, planBulk } from './bulk.ts'
 import { THEME_COOKIE, nextTheme, parseTheme, themeCookie } from './theme.ts'
 
@@ -57,16 +57,47 @@ test('autosave goes to the draft row, the staged copy of a live post, or this br
   assert.ok(AUTOSAVE_DELAY_MS >= 1000 && AUTOSAVE_DELAY_MS <= 10000)
 })
 
-test('a draft with a staged copy autosaves to the staged copy, and a scheduled post is never autosaved', () => {
+test('a draft with a staged copy autosaves to the staged copy, and so does a scheduled post', () => {
   // The editor opens on the staged copy, so writing the draft row would be
   // lost when the staged copy is published (review finding 1).
   assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'staged' }), 'staged')
   assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'in_review' }), 'paused')
   assert.equal(autosaveTarget({ postId: 'p', isLive: false, stagedReviewStatus: 'approved' }), 'paused')
-  // A scheduled post goes live on its own: half-typed text must not (finding 2).
-  assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true }), 'off')
+  // A scheduled post goes live on its own, so half-typed text waits in its
+  // staged copy, like a live post's (1.4.0: scheduled posts take the staging path).
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true }), 'staged')
   assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true, stagedReviewStatus: 'staged' }), 'staged')
-  assert.match(autosaveLabel({ target: 'off', dirty: true, saving: false, savedAt: null, error: null }), /scheduled post saves when you press Update/)
+  assert.equal(autosaveTarget({ postId: 'p', isLive: false, isScheduled: true, stagedReviewStatus: 'in_review' }), 'paused')
+})
+
+test('an explicit save waits for the autosave in flight, and no autosave starts after it', async () => {
+  const gate = createSaveGate()
+  let finish
+  const order = []
+  const first = gate.autosave(() => new Promise((resolve) => { finish = () => { order.push('autosave landed'); resolve() } }))
+  assert.equal(gate.busy, true)
+  // A second autosave while one is in flight is skipped, not queued.
+  assert.equal(await gate.autosave(async () => order.push('second autosave')), false)
+  const saving = gate.beginSave().then(() => order.push('save writes'))
+  await new Promise((r) => setTimeout(r, 5))
+  assert.deepEqual(order, [])
+  finish()
+  await saving
+  assert.equal(await first, true)
+  assert.deepEqual(order, ['autosave landed', 'save writes'])
+  // While the explicit save runs (and after it succeeds) autosave stays off.
+  assert.equal(await gate.autosave(async () => order.push('late autosave')), false)
+  // A failed save opens it again.
+  gate.endSave()
+  assert.equal(await gate.autosave(async () => order.push('autosave again')), true)
+  assert.deepEqual(order, ['autosave landed', 'save writes', 'autosave again'])
+})
+
+test('a failed autosave does not leave the gate stuck', async () => {
+  const gate = createSaveGate()
+  await assert.rejects(gate.autosave(async () => { throw new Error('network') }))
+  assert.equal(gate.busy, false)
+  await gate.beginSave()
 })
 
 test('unsaved changes are content changes, not key order', () => {

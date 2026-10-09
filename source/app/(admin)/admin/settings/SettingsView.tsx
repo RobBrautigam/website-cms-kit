@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import ChangePassword from '@/components/admin/ChangePassword'
 import { TwoFactorSection } from '@/components/admin/TwoFactorSection'
+import StagedImageCleanup from '@/components/admin/StagedImageCleanup'
 import type { AdminRole } from '@/lib/auth/types'
 
 export default function SettingsView({
@@ -101,6 +102,15 @@ export default function SettingsView({
               Open Team
             </Link>
           </div>
+        </section>
+      )}
+
+      {role === 'super_admin' && (
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary/60 mb-3">
+            Storage
+          </h2>
+          <StagedImageCleanup />
         </section>
       )}
 

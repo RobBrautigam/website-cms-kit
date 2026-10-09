@@ -5,9 +5,11 @@ import { requireAdmin } from '@/lib/auth/require'
 import { crossSiteRefusal } from '@/lib/security/request-origin'
 import { aiLimitRefusal } from '@/lib/security/rate-limit'
 import { consumeAiCall } from '@/lib/security/rate-limit-db'
+import { beginAiSpend } from '@/lib/ai/spend'
 import { GenerateInput, GeneratedPost, parseModelJson } from '@/lib/ai/schemas'
 
 const client = new Anthropic()
+const MODEL = 'claude-sonnet-4-6'
 
 const SYSTEM_PROMPT = `You are a helpful blog-writing assistant. Write clear, well-structured, SEO-aware blog posts on the given topic.
 
@@ -24,7 +26,7 @@ const SYSTEM_PROMPT = `You are a helpful blog-writing assistant. Write clear, we
 - Use H2 and H3 headings (NEVER H1 inside the body)
 - Strong opening hook within the first paragraph
 - End with a clear takeaway or call to action
-- Weave SEO keywords naturally — never force them
+- Weave SEO keywords naturally - never force them
 
 ## Output Format
 You MUST return valid JSON with this exact structure:
@@ -69,26 +71,30 @@ export async function POST(request: NextRequest) {
   // try so the catch below doesn't swallow it into a 500. Then one call from
   // this admin's budget (lib/security/rate-limit.ts).
   const { user } = await requireAdmin()
+  // The body first: a malformed request is refused before any budget is spent.
+  const input = GenerateInput.safeParse(await request.json().catch(() => null))
+  if (!input.success) {
+    return NextResponse.json({ error: 'Send a topic (up to 500 characters) and at most 20 keywords.' }, { status: 400 })
+  }
+  const { topic, keywords } = input.data
   const limited = await aiLimitRefusal(() => consumeAiCall(user.id))
   if (limited) return limited
+  // No spend record, no call (lib/ai/spend.ts).
+  const spend = await beginAiSpend(user.id, 'ai/generate', MODEL)
+  if (spend instanceof Response) return spend
   try {
-    const input = GenerateInput.safeParse(await request.json().catch(() => null))
-    if (!input.success) {
-      return NextResponse.json({ error: 'Send a topic (up to 500 characters) and at most 20 keywords.' }, { status: 400 })
-    }
-    const { topic, keywords } = input.data
-
     let userPrompt = `Write a blog post about: ${topic}`
     if (keywords && keywords.length > 0) {
       userPrompt += `\n\nTarget SEO keywords: ${keywords.join(', ')}`
     }
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL,
       max_tokens: 8000,
       messages: [{ role: 'user', content: userPrompt }],
       system: SYSTEM_PROMPT,
     })
+    await spend.settle(message.usage)
 
     const textContent = message.content.find((c) => c.type === 'text')
     if (!textContent || textContent.type !== 'text') {
@@ -101,6 +107,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 502 })
     return NextResponse.json(parsed.data)
   } catch (e) {
+    await spend.failed(e)
     console.error('AI generation error:', e)
     return NextResponse.json({ error: 'Generation failed.' }, { status: 500 })
   }

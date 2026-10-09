@@ -5,7 +5,7 @@ import { isLastActiveSuperAdmin } from '@/lib/auth/team-queries'
 import { recordAdminAction } from '@/lib/auth/audit'
 import { crossSiteRefusal } from '@/lib/security/request-origin'
 
-// 100 years in hours — Supabase's ban_duration accepts a Go-style duration
+// 100 years in hours - Supabase's ban_duration accepts a Go-style duration
 // string. Effectively permanent for any human admin lifetime, and trivially
 // reversible via /reactivate.
 const BAN_DURATION = '876000h'

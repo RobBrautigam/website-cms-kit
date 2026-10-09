@@ -21,8 +21,8 @@ export default function ForgotPasswordForm() {
       redirectTo: `${window.location.origin}/admin/reset-password?context=recovery`,
     })
 
-    // We surface real errors here. This admin is invite-only — no public
-    // signup — so the conventional anti-enumeration ("always show success")
+    // We surface real errors here. This admin is invite-only - no public
+    // signup - so the conventional anti-enumeration ("always show success")
     // would just hide useful feedback like rate limits without giving us any
     // security benefit. Linear/Stripe internal-team flows do the same.
     if (error) {

@@ -28,6 +28,7 @@ const STUBBED = {
   '@/lib/auth/reauth': 'reauth.mjs',
   '@/lib/supabase/server': 'supabase-server.mjs',
   '@/lib/security/rate-limit-db': 'rate-limit-db.mjs',
+  'next/cache': 'next-cache.mjs',
 }
 
 function withTs(url) {

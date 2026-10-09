@@ -9,9 +9,9 @@ import { TwoFactorEnrollmentModal } from "@/components/admin/TwoFactorEnrollment
  * the grace window has elapsed and the user still has no verified factor.
  *
  * Reuses the existing TwoFactorEnrollmentModal in non-dismissable mode: the
- * onClose handler is a no-op, so the modal's own "I've saved these — Continue"
+ * onClose handler is a no-op, so the modal's own "I've saved these - Continue"
  * button is the only exit. The modal shell still wires the close affordance
- * to that no-op, which is intentional — there's nowhere to escape to until
+ * to that no-op, which is intentional - there's nowhere to escape to until
  * the factor is verified.
  */
 export function EnrollView() {
@@ -30,7 +30,7 @@ export function EnrollView() {
       <TwoFactorEnrollmentModal
         onClose={() => {
           /* No-op: the user cannot dismiss this view. The modal's
-             "I've saved these — Continue" button is the only exit. */
+             "I've saved these - Continue" button is the only exit. */
         }}
         onComplete={() => {
           setDone(true);

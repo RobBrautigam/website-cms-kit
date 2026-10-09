@@ -5,7 +5,7 @@ import { useFocusTrap } from '@/lib/a11y/useFocusTrap'
 
 interface ModalShellProps {
   onClose: () => void
-  /** ID of the heading element inside the modal — wired to aria-labelledby. */
+  /** ID of the heading element inside the modal - wired to aria-labelledby. */
   ariaLabelledBy: string
   /** Override the default panel class (defaults to max-w-md). */
   panelClassName?: string

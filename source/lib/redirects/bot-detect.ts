@@ -8,7 +8,7 @@
  *
  * NOT a security boundary. Sophisticated scrapers can spoof a browser UA
  * and will not be blocked. The goal is to filter the loud, well-behaved
- * majority — Googlebot, Bingbot, FacebookExternalHit, UptimeRobot, etc.
+ * majority - Googlebot, Bingbot, FacebookExternalHit, UptimeRobot, etc.
  */
 
 const BOT_UA_PATTERNS: readonly string[] = [
@@ -79,14 +79,14 @@ const BOT_UA_PATTERNS: readonly string[] = [
 
 /**
  * Returns true if the User-Agent looks like a bot, link previewer, or
- * uptime monitor. Returns true for null/empty UAs as well — a request
+ * uptime monitor. Returns true for null/empty UAs as well - a request
  * with no UA is more likely to be a script than a real browser, and the
  * cost of a false positive (one missed hit) is far lower than a false
  * negative (inflated counts).
  *
  * The check is case-insensitive substring match against a denylist.
  * `curl/`, `wget/`, and `python-requests/` are intentionally NOT in the
- * denylist — those are the manual-smoke-test paths and we want them to
+ * denylist - those are the manual-smoke-test paths and we want them to
  * count as real hits during verification.
  */
 export function isBot(userAgent: string | null | undefined): boolean {

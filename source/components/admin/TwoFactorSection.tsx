@@ -334,7 +334,7 @@ export function TwoFactorSection({
             onClick={() => setNewCodes(null)}
             className="w-full mt-3 rounded-lg bg-text-primary text-white px-4 py-2 text-sm font-medium"
           >
-            I&apos;ve saved them — Continue
+            I&apos;ve saved them - Continue
           </button>
         </ModalShell>
       )}

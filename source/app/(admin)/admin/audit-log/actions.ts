@@ -38,7 +38,7 @@ const PAGE_SIZE_DEFAULT = 50;
 const PAGE_SIZE_MAX = 200;
 const EXPORT_LIMIT = 10000;
 
-// audit:exempt — read-only audit log query
+// audit:exempt - read-only audit log query
 export async function listAuditLog(
   filters: AuditLogFilters
 ): Promise<ActionResult<{ rows: AuditLogRow[]; total: number }>> {
@@ -89,7 +89,7 @@ export async function listAuditLog(
   return ok({ rows: (data ?? []) as AuditLogRow[], total: count ?? 0 });
 }
 
-// audit:exempt — meta-event recorded explicitly below; no row mutations
+// audit:exempt - meta-event recorded explicitly below; no row mutations
 export async function exportAuditLogCSV(
   filters: AuditLogFilters
 ): Promise<ActionResult<string>> {

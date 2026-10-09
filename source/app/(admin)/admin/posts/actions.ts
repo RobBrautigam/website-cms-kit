@@ -45,26 +45,28 @@ export async function deletePost(id: string): Promise<ActionResult> {
 /**
  * Sets the post status to `published` or `draft` based on the `next` flag.
  *
- * The `next` boolean is the desired post-toggle state — true means publish,
+ * The `next` boolean is the desired post-toggle state - true means publish,
  * false means draft. This matches the `<ToggleButton>` contract exactly so
  * the optimistic UI and the server mutation cannot diverge under concurrent
  * edits.
  *
  * Posts with the legacy `scheduled` status get treated like `draft` for
- * toggle purposes — clicking the badge on a scheduled post publishes it
+ * toggle purposes - clicking the badge on a scheduled post publishes it
  * immediately.
  */
 export async function togglePostStatus(
   id: string,
   next: boolean
-): Promise<ActionResult> {
+): Promise<ActionResult<{ imageWarning?: string }>> {
   await requireAdmin();
   const supabase = await createServerSupabaseClient();
   const updates: Record<string, unknown> = {
     status: next ? "published" : "draft",
   };
+  let goingLive: { featured_image_url?: unknown; body?: unknown } | null = null;
   if (next) {
-    // Going live: alt text first, then the post's staged images go public.
+    // Going live: alt text first; the staged images go public once the
+    // publish write below has succeeded.
     const { data: post, error: readError } = await supabase
       .from("blog_posts")
       .select("featured_image_url, featured_image_alt, body")
@@ -79,15 +81,14 @@ export async function togglePostStatus(
       body: post.body,
     });
     if (missing) return err(missing, "validation");
-    const failed = await promoteImages(post);
-    if (failed) return err(failed, "server");
     updates.published_at = new Date().toISOString();
+    goingLive = post;
   }
   const { data, error } = await supabase
     .from("blog_posts")
     .update(updates)
     .eq("id", id)
-    .select("id")
+    .select("id, featured_image_url, body")
     .maybeSingle();
   const wrapped = wrapSupabaseError(error);
   if (wrapped) return wrapped;
@@ -100,7 +101,15 @@ export async function togglePostStatus(
   });
   revalidatePath("/admin/posts");
   revalidatePath("/blog");
-  return ok();
+  if (goingLive) {
+    // Promote from the row as written, never the one read before the write.
+    const failed = await promoteImages(data, id);
+    if (failed)
+      return ok({
+        imageWarning: `Published, but an image could not be made public yet. Open the post and press Make images public to try again. ${failed}`,
+      });
+  }
+  return ok({});
 }
 
 export async function duplicatePost(
@@ -214,21 +223,20 @@ export async function bulkPostAction(
 
   const byId = new Map(rows.map((p) => [p.id as string, p]));
   const applied: string[] = [];
+  const imagesPending: string[] = [];
   for (const id of plan.apply) {
     const post = byId.get(id)!;
     let error;
+    let written: { featured_image_url?: unknown; body?: unknown } | null = null;
     if (action === "delete") {
       ({ error } = await supabase.from("blog_posts").delete().eq("id", id));
     } else if (action === "publish") {
-      const failed = await promoteImages(post);
-      if (failed) {
-        plan.skipped.push({ id, title: post.title as string, reason: failed });
-        continue;
-      }
-      ({ error } = await supabase
+      ({ error, data: written } = await supabase
         .from("blog_posts")
         .update({ status: "published", published_at: new Date().toISOString() })
-        .eq("id", id));
+        .eq("id", id)
+        .select("featured_image_url, body")
+        .maybeSingle());
     } else {
       ({ error } = await supabase.from("blog_posts").update({ status: "draft" }).eq("id", id));
     }
@@ -237,6 +245,8 @@ export async function bulkPostAction(
       continue;
     }
     applied.push(id);
+    // The images go public only after the publish write succeeded.
+    if (action === "publish" && written && (await promoteImages(written, id))) imagesPending.push(post.title as string);
     await recordAdminAction({
       action:
         action === "delete" ? "blog_post.delete" : action === "publish" ? "blog_post.publish" : "blog_post.unpublish",
@@ -249,5 +259,8 @@ export async function bulkPostAction(
 
   revalidatePath("/admin/posts");
   revalidatePath("/blog");
-  return ok({ applied: applied.length, skipped: plan.skipped.length, summary: bulkSummary(action, plan) });
+  const pending = imagesPending.length
+    ? ` Images not public yet for: ${imagesPending.join(", ")}. Open each post and press Make images public.`
+    : "";
+  return ok({ applied: applied.length, skipped: plan.skipped.length, summary: bulkSummary(action, plan) + pending });
 }

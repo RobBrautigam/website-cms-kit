@@ -78,7 +78,7 @@ export default function ResetPasswordForm({
         return
       }
 
-      // Case 4: no auth in any form — invalid landing
+      // Case 4: no auth in any form - invalid landing
       setStatus('invalid')
     }
 
@@ -213,7 +213,7 @@ export default function ResetPasswordForm({
         </div>
       </div>
 
-      {/* Live requirements checklist — replaces the strength meter. Each
+      {/* Live requirements checklist - replaces the strength meter. Each
           row turns green with a check icon as the requirement is met. */}
       <ul className="space-y-1.5 text-[12px]">
         {passwordCheck.checks.map((c) => {

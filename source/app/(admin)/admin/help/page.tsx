@@ -8,7 +8,7 @@ import { requireAdmin } from '@/lib/auth/require'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Help — Acme Admin',
+  title: 'Help - Acme Admin',
   robots: { index: false, follow: false },
 }
 

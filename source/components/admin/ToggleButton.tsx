@@ -20,13 +20,13 @@ interface Props {
    *
    * IMPORTANT: when this component is rendered from a server component
    * (e.g., `src/app/(admin)/admin/jobs/page.tsx`), the `action` prop must be
-   * a server action — either the imported function directly, or a bound
+   * a server action - either the imported function directly, or a bound
    * version like `toggleJobActive.bind(null, job.id)`. Plain arrow closures
    * (`(next) => toggleJobActive(job.id, next)`) cannot cross the RSC→client
    * boundary and will throw "Functions cannot be passed directly to Client
    * Components" at request time.
    */
-  action: (next: boolean) => Promise<ActionResult>;
+  action: (next: boolean) => Promise<ActionResult<{ imageWarning?: string } | void>>;
   /** Toast copy when the toggle settles to ON (true). */
   onSuccessCopy: string;
   /** Toast copy when the toggle settles to OFF (false). */
@@ -68,6 +68,9 @@ export default function ToggleButton({
       const result = await action(next);
       if (result.ok) {
         toast.success(next ? onSuccessCopy : offSuccessCopy);
+        // Live, but an image is still private (lib/staging/promote-images.ts).
+        const warning = (result.data as { imageWarning?: string } | undefined)?.imageWarning;
+        if (warning) toast.warning(warning);
       } else {
         toast.error(result.error);
       }
