@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
+import AdminImage from './AdminImage'
 
 interface ImageUploaderProps {
   currentUrl?: string
@@ -50,8 +51,7 @@ export default function ImageUploader({ currentUrl, onUpload, label = 'Featured 
       <label className="block text-sm font-semibold text-text-secondary mb-1.5">{label}</label>
       {preview ? (
         <div className="relative rounded-lg overflow-hidden border border-border">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Preview" className="w-full aspect-[16/9] object-cover" />
+          <AdminImage src={preview} alt="Preview" className="w-full aspect-[16/9] object-cover" />
           <button
             type="button"
             onClick={handleRemove}

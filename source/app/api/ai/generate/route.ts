@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAdmin } from '@/lib/auth/require'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
+import { aiLimitRefusal } from '@/lib/security/rate-limit'
+import { consumeAiCall } from '@/lib/security/rate-limit-db'
+import { GenerateInput, GeneratedPost, parseModelJson } from '@/lib/ai/schemas'
 
 const client = new Anthropic()
 
@@ -56,18 +60,23 @@ Available categories: customize this list to match your site's taxonomy.
 Return ONLY the JSON object, no markdown code fences or other text.`
 
 export async function POST(request: NextRequest) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   // Admin-only: gate BEFORE reading the body or calling Anthropic. The proxy
   // does NOT cover /api/*, so this server-side check is what stops anonymous
   // traffic from triggering paid generations. requireAdmin() throws a redirect
-  // for unauthenticated callers (a 307 in a route handler) — keep it OUTSIDE the
-  // try so the catch below doesn't swallow it into a 500.
-  await requireAdmin()
+  // for unauthenticated callers (a 307 in a route handler); keep it OUTSIDE the
+  // try so the catch below doesn't swallow it into a 500. Then one call from
+  // this admin's budget (lib/security/rate-limit.ts).
+  const { user } = await requireAdmin()
+  const limited = await aiLimitRefusal(() => consumeAiCall(user.id))
+  if (limited) return limited
   try {
-    const { topic, keywords } = await request.json()
-
-    if (!topic) {
-      return NextResponse.json({ error: 'Topic is required' }, { status: 400 })
+    const input = GenerateInput.safeParse(await request.json().catch(() => null))
+    if (!input.success) {
+      return NextResponse.json({ error: 'Send a topic (up to 500 characters) and at most 20 keywords.' }, { status: 400 })
     }
+    const { topic, keywords } = input.data
 
     let userPrompt = `Write a blog post about: ${topic}`
     if (keywords && keywords.length > 0) {
@@ -83,28 +92,16 @@ export async function POST(request: NextRequest) {
 
     const textContent = message.content.find((c) => c.type === 'text')
     if (!textContent || textContent.type !== 'text') {
-      return NextResponse.json({ error: 'No content generated' }, { status: 500 })
+      return NextResponse.json({ error: 'No content generated' }, { status: 502 })
     }
 
-    // Parse the JSON response
-    let parsed
-    try {
-      // Strip markdown code fences if present
-      let jsonStr = textContent.text.trim()
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-      }
-      parsed = JSON.parse(jsonStr)
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
-    }
-
-    return NextResponse.json(parsed)
+    // Model text is untrusted: the post must be the promised shape, and its
+    // body may hold only what the site draws (lib/tiptap/schema.ts).
+    const parsed = parseModelJson(textContent.text, GeneratedPost)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 502 })
+    return NextResponse.json(parsed.data)
   } catch (e) {
     console.error('AI generation error:', e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Generation failed' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Generation failed.' }, { status: 500 })
   }
 }

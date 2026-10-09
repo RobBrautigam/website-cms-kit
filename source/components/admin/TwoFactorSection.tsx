@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { TwoFactorEnrollmentModal } from "./TwoFactorEnrollmentModal";
-import ConfirmDialog from "./ConfirmDialog";
 import ModalShell from "./ModalShell";
 
 interface MFAFactor {
@@ -61,14 +60,18 @@ export function TwoFactorSection({
     setBusy(true);
     const res = await fetch("/api/admin/mfa/regenerate-codes", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
     });
     setBusy(false);
     if (!res.ok) {
-      toast.error("Could not regenerate codes");
+      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+      toast.error(json?.error ?? "Could not regenerate codes");
       return;
     }
     const json = (await res.json()) as { recovery_codes: string[] };
     setConfirmRegenerate(false);
+    setPassword("");
     setNewCodes(json.recovery_codes);
   };
 
@@ -234,15 +237,54 @@ export function TwoFactorSection({
       )}
 
       {confirmRegenerate && (
-        <ConfirmDialog
-          title="Regenerate recovery codes?"
-          description="Your old recovery codes will stop working immediately. You'll need to save the new ones somewhere safe."
-          confirmLabel="Regenerate"
-          confirmTone="primary"
-          pending={busy}
-          onConfirm={() => void onRegenerate()}
-          onClose={() => setConfirmRegenerate(false)}
-        />
+        <ModalShell
+          onClose={() => {
+            if (!busy) {
+              setConfirmRegenerate(false);
+              setPassword("");
+            }
+          }}
+          ariaLabelledBy="regenerate-codes-title"
+        >
+          <h2 id="regenerate-codes-title" className="text-xl font-bold mb-2">
+            Regenerate recovery codes?
+          </h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Your old recovery codes stop working immediately. Confirm with your
+            password, then save the new ones somewhere safe.
+          </p>
+          <input
+            type="password"
+            placeholder="Your password"
+            aria-label="Your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded border border-border bg-bg-white px-3 py-2 text-sm mb-4"
+            disabled={busy}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmRegenerate(false);
+                setPassword("");
+              }}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg border border-border text-text-primary text-sm font-medium hover:bg-bg-card transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void onRegenerate()}
+              disabled={busy || !password}
+              className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
+            >
+              {busy ? "Regenerating…" : "Regenerate"}
+            </button>
+          </div>
+        </ModalShell>
       )}
 
       {newCodes && (

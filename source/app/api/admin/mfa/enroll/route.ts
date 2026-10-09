@@ -1,10 +1,13 @@
 import { requirePartialAdmin } from "@/lib/auth/require";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { crossSiteRefusal } from "@/lib/security/request-origin";
 
 // Initiates MFA enrollment; the audit row is written by the verify-enroll
 // route once the user proves possession of the new factor.
 // audit:exempt — enrollment kickoff is read-only-ish; verify-enroll audits.
-export async function POST() {
+export async function POST(request: Request) {
+  const refused = crossSiteRefusal(request);
+  if (refused) return refused;
   await requirePartialAdmin();
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });

@@ -15,7 +15,7 @@
   var STORE_KEY = 'cmskit-demo-v2';
   var THEME_KEY = 'cmskit-demo-theme';
   var SESSION_KEY = 'cmskit-demo-session';
-  var DEMO_VERSION = 'v1.2.0 demo';
+  var DEMO_VERSION = 'v1.3.0 demo';
   var DEMO_TOTP = '123456';
   var CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
   var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -358,7 +358,37 @@
     if (!p.draft.title.trim()) errs.push('Add a title.');
     if (!SLUG_RE.test(p.draft.slug)) errs.push('Fix the URL slug (lowercase letters, numbers and dashes).');
     else if (slugTaken(p.draft.slug, p.id)) errs.push('Another post already uses this URL slug.');
+    var alt = altProblem(p.draft);
+    if (alt) errs.push(alt);
     return errs;
+  }
+  // Alt text is required before anything goes live, on the featured image and
+  // on every body image (the kit's lib/admin/alt-text.ts). Drafts save without it.
+  function imagesMissingAlt(node) {
+    if (!node) return 0;
+    var n = node.type === 'image' && !String((node.attrs && node.attrs.alt) || '').trim() ? 1 : 0;
+    (node.content || []).forEach(function (c) { n += imagesMissingAlt(c); });
+    return n;
+  }
+  function coverAlt(d) {
+    if (typeof d.coverAlt === 'string') return d.coverAlt;
+    var m = db.media.filter(function (x) { return x.src === d.cover; })[0];
+    return m ? m.alt : '';
+  }
+  function altProblem(d) {
+    var parts = [];
+    if (d.cover && !coverAlt(d).trim()) parts.push('the featured image');
+    var n = imagesMissingAlt(d.body);
+    if (n) parts.push(n === 1 ? '1 image in the post' : n + ' images in the post');
+    return parts.length ? 'Add alt text before this goes live: ' + parts.join(' and ') + '.' : '';
+  }
+  // Search result and share card text, clipped the way lib/admin/previews.ts clips it.
+  var SITE_HOST = 'www.example.com';
+  function clipText(t, max) {
+    t = String(t || '').trim().replace(/\s+/g, ' ');
+    if (t.length <= max) return t;
+    var cut = t.slice(0, max - 1), sp = cut.lastIndexOf(' ');
+    return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/\s+$/, '') + '…';
   }
 
   // Rendering stored TipTap JSON to HTML, with the same link and image
@@ -701,7 +731,12 @@
         '<label class="sr-only" for="psort">Sort</label><select class="input" id="psort">' + opts([['updated', 'Last updated'], ['oldest', 'Oldest first'], ['az', 'Title A to Z'], ['za', 'Title Z to A']], postFilters.sort) + '</select>' +
       '</div>' +
       '<p class="count-line" id="pcount" aria-live="polite"></p>' +
-      '<div class="table-wrap"><table class="tbl"><caption class="sr-only">Posts</caption><thead><tr><th scope="col">Title</th><th scope="col" class="col-wide">Status</th><th scope="col" class="col-opt">Category</th><th scope="col" class="col-opt">Updated</th><th scope="col" class="actions"><span class="sr-only">Actions</span></th></tr></thead><tbody id="prows"></tbody></table></div>'
+      '<div class="bulk-bar" id="pbulk" role="region" aria-label="Bulk actions" hidden><span class="n" id="pbulk-n" aria-live="polite"></span>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-bulk="publish">' + icon('send') + 'Publish</button>' +
+        '<button type="button" class="btn btn-outline btn-sm" data-bulk="unpublish">' + icon('eyeoff') + 'Unpublish</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" data-bulk="delete">' + icon('trash') + 'Delete</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-bulk="clear">Clear</button></div>' +
+      '<div class="table-wrap"><table class="tbl"><caption class="sr-only">Posts</caption><thead><tr><th scope="col" class="sel"><input type="checkbox" id="pall" aria-label="Select every post shown"></th><th scope="col">Title</th><th scope="col" class="col-wide">Status</th><th scope="col" class="col-opt">Category</th><th scope="col" class="col-opt">Updated</th><th scope="col" class="actions"><span class="sr-only">Actions</span></th></tr></thead><tbody id="prows"></tbody></table></div>'
     );
     // Max ~50 posts in the demo store. Plain render (the 50-row law: no virtualization below 50).
     function rows() {
@@ -730,6 +765,7 @@
         var r = reviewOf(p);
         var staged = r ? ' <a class="staged-link" href="#/staging" title="Waiting in staging: the live post is unchanged">' + reviewChip(r) + '</a>' : '';
         return '<tr>' +
+          '<td class="sel"><input type="checkbox" data-pick="' + esc(p.id) + '"' + (picked[p.id] ? ' checked' : '') + ' aria-label="Select ' + esc(title) + '"></td>' +
           '<td class="title-cell"><a href="#/posts/' + esc(p.id) + '">' + esc(title) + '</a><div class="sub mono">/blog/' + esc(p.draft.slug || '') + '</div><div class="col-narrow mt-4">' + chip(s) + staged + '</div></td>' +
           '<td class="col-wide">' + chip(s) + staged + '</td>' +
           '<td class="col-opt">' + esc(p.draft.category || '') + '</td>' +
@@ -741,8 +777,77 @@
             pubBtn +
             '<button type="button" class="icon-btn danger" data-act="delete-post" data-id="' + esc(p.id) + '" aria-label="Delete ' + esc(title) + '" title="Delete">' + icon('trash') + '</button>' +
           '</td></tr>';
-      }).join('') : '<tr><td colspan="5" class="empty">No posts match these filters. <button type="button" class="btn btn-ghost btn-sm" data-act="clear-post-filters">Clear filters</button></td></tr>';
+      }).join('') : '<tr><td colspan="6" class="empty">No posts match these filters. <button type="button" class="btn btn-ghost btn-sm" data-act="clear-post-filters">Clear filters</button></td></tr>';
+      shown = list.map(function (p) { return p.id; });
+      syncBulk();
     }
+    // Bulk actions (1.3.0, the kit's PostsTable and lib/admin/bulk.ts): each
+    // picked post is applied or skipped with its reason; one bad row never
+    // blocks the rest, and nothing is skipped silently.
+    var picked = {}, shown = [];
+    function pickedIds() { return db.posts.filter(function (p) { return picked[p.id]; }).map(function (p) { return p.id; }); }
+    function syncBulk() {
+      var n = pickedIds().length, bar = $('#pbulk');
+      bar.hidden = !n;
+      $('#pbulk-n').textContent = plural(n, 'post', 'posts') + ' selected';
+      var all = $('#pall'), on = shown.filter(function (id) { return picked[id]; }).length;
+      all.checked = !!shown.length && on === shown.length;
+      all.indeterminate = on > 0 && on < shown.length;
+    }
+    function planBulk(action, posts) {
+      var plan = { apply: [], skipped: [] };
+      posts.forEach(function (p) {
+        var s = postState(p), live = s === 'published' || s === 'changed', r = reviewOf(p);
+        var skip = function (why) { plan.skipped.push((p.draft.title || 'Untitled post') + ' (' + why + ')'); };
+        if (action === 'publish') {
+          var probs = publishProblems(p);
+          if (live) skip('Already live.');
+          else if (altProblem(p.draft)) skip('Images without alt text.');
+          else if (probs.length) skip(probs[0]);
+          else if (!canPublishReview(r)) skip('Waiting in review.');
+          else plan.apply.push(p);
+        } else if (action === 'unpublish') {
+          if (!live) skip('Not live.');
+          else plan.apply.push(p);
+        } else if (r) skip('Has a staged change: discard it on the Staging page first.');
+        else plan.apply.push(p);
+      });
+      return plan;
+    }
+    function runBulk(action) {
+      var plan = planBulk(action, db.posts.filter(function (p) { return picked[p.id]; }));
+      var verb = { publish: 'Published', unpublish: 'Unpublished', delete: 'Deleted' }[action];
+      function summary() { return verb + ' ' + plural(plan.apply.length, 'post', 'posts') + '.' + (plan.skipped.length ? ' Skipped ' + plan.skipped.length + ': ' + plan.skipped.join('; ') : ''); }
+      if (!plan.apply.length) { toast('Nothing to do. Skipped ' + plan.skipped.length + ': ' + plan.skipped.join('; '), 'err'); return; }
+      var names = { publish: 'Publish', unpublish: 'Unpublish', delete: 'Delete' };
+      confirmDialog({
+        title: names[action] + ' ' + plural(plan.apply.length, 'post', 'posts') + '?',
+        desc: (action === 'delete' ? 'They are deleted for good. This cannot be undone.' : action === 'publish' ? 'They go live on the public site.' : 'They come off the public site and stay here as drafts.') +
+          (plan.skipped.length ? ' ' + esc(plural(plan.skipped.length, 'post is', 'posts are')) + ' skipped; the summary says why.' : ''),
+        confirm: names[action], danger: action === 'delete',
+        onConfirm: function () {
+          plan.apply.forEach(function (p) {
+            var title = p.draft.title || 'Untitled post';
+            if (action === 'publish') publishPost(p);
+            else if (action === 'unpublish') { p.live = null; p.status = 'draft'; p.review = null; p.updatedAt = nowIso(); audit('blog_post.unpublish', 'blog_post', p.id, { title: title }); }
+            else { db.posts = db.posts.filter(function (x) { return x.id !== p.id; }); audit('blog_post.delete', 'blog_post', p.id, { title: title }); }
+          });
+          picked = {}; save(); toast(summary(), plan.skipped.length ? 'err' : ''); rows(); refreshBadges();
+        }
+      });
+    }
+    $('#pall').addEventListener('change', function (e) { shown.forEach(function (id) { if (e.target.checked) picked[id] = true; else delete picked[id]; }); rows(); });
+    $('#prows').addEventListener('change', function (e) {
+      var id = e.target.getAttribute('data-pick'); if (!id) return;
+      if (e.target.checked) picked[id] = true; else delete picked[id];
+      syncBulk();
+    });
+    $('#pbulk').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-bulk]'); if (!b) return;
+      var a = b.getAttribute('data-bulk');
+      if (a === 'clear') { picked = {}; rows(); return; }
+      runBulk(a);
+    });
     rows();
     $('#pq').addEventListener('input', function (e) { postFilters.q = e.target.value; rows(); });
     $('#pstatus').addEventListener('change', function (e) { postFilters.status = e.target.value; rows(); });
@@ -813,6 +918,7 @@
             '<div class="field"><label class="lbl" for="excerpt">Excerpt</label><textarea class="input" id="excerpt" maxlength="200" aria-describedby="ex-count">' + esc(p.draft.excerpt) + '</textarea><p class="hint" id="ex-count"></p></div>' +
             '<div class="field"><label class="lbl" for="meta">Search description</label><textarea class="input" id="meta" maxlength="160" aria-describedby="meta-count">' + esc(p.draft.metaDescription) + '</textarea><p class="hint" id="meta-count"></p></div>' +
           '</section>' +
+          '<section class="side-card" aria-labelledby="s-prev"><h2 id="s-prev">Search and social preview <span class="tag-new">New in 1.3.0</span></h2><div id="prev-box" aria-live="polite"></div></section>' +
         '</div>' +
       '</div>'
     );
@@ -848,10 +954,11 @@
       if (!editor) return;
       $all('.tb[data-cmd]').forEach(function (b) {
         var c = b.getAttribute('data-cmd'), on = false;
-        if (c === 'bold' || c === 'italic' || c === 'underline' || c === 'strike' || c === 'bulletList' || c === 'orderedList' || c === 'blockquote' || c === 'link') on = editor.isActive(c);
+        if (c === 'bold' || c === 'italic' || c === 'underline' || c === 'strike' || c === 'code' || c === 'codeBlock' || c === 'bulletList' || c === 'orderedList' || c === 'blockquote' || c === 'link') on = editor.isActive(c);
         else if (c === 'h2') on = editor.isActive('heading', { level: 2 });
         else if (c === 'h3') on = editor.isActive('heading', { level: 3 });
         if (b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (c === 'alt') b.disabled = !editor.isActive('image');
         if (c === 'undo') b.disabled = !editor.can().undo();
         if (c === 'redo') b.disabled = !editor.can().redo();
       });
@@ -866,6 +973,8 @@
       else if (c === 'italic') ch.toggleItalic().run();
       else if (c === 'underline') ch.toggleUnderline().run();
       else if (c === 'strike') ch.toggleStrike().run();
+      else if (c === 'code') ch.toggleCode().run();
+      else if (c === 'codeBlock') ch.toggleCodeBlock().run();
       else if (c === 'h2') ch.toggleHeading({ level: 2 }).run();
       else if (c === 'h3') ch.toggleHeading({ level: 3 }).run();
       else if (c === 'bulletList') ch.toggleBulletList().run();
@@ -875,16 +984,34 @@
       else if (c === 'undo') ch.undo().run();
       else if (c === 'redo') ch.redo().run();
       else if (c === 'link') linkDialog(editor);
-      else if (c === 'image') pickMedia(function (m) { editor.chain().focus().setImage({ src: m.src, alt: m.alt || '' }).run(); });
+      else if (c === 'image') pickMedia(function (m) {
+        // As in the kit's PostEditor: an image with no alt text asks for it on the way in.
+        if (m.alt) { editor.chain().focus().setImage({ src: m.src, alt: m.alt }).run(); return; }
+        altDialog('', function (alt) { editor.chain().focus().setImage({ src: m.src, alt: alt }).run(); });
+      });
+      else if (c === 'alt') altDialog(editor.getAttributes('image').alt || '', function (alt) { editor.chain().focus().updateAttributes('image', { alt: alt }).run(); });
     });
+    function altDialog(current, onSave) {
+      openModal({
+        title: 'Alt text', desc: 'Describe what the image shows. It is required before the post goes live: screen readers say it, and it shows if the image fails to load.',
+        body: '<div class="field"><label class="lbl" for="ed-alt">Alt text</label><input class="input" id="ed-alt" maxlength="200" value="' + esc(current) + '" autofocus></div>',
+        actions: '<button type="button" class="btn btn-outline" data-close>Cancel</button><button type="submit" class="btn btn-primary">Save alt text</button>',
+        onSubmit: function (f, close) { var v = $('#ed-alt', f).value.trim(); close(); onSave(v); }
+      });
+    }
 
-    // Autosave: every change is written to this browser after a short pause,
-    // the way the kit's PostForm autosaves to localStorage for restore.
+    // Autosave: every change is saved after a short pause. The kit (1.3.0)
+    // saves a draft to its own row and a live post's edits to its staged copy;
+    // this demo keeps both in your browser. Until the save lands the label
+    // reads "Unsaved changes" and closing the tab asks first.
     var timer = null;
     function changed() {
-      $('#save-state').classList.add('saving'); $('#save-text').textContent = 'Saving...';
-      clearTimeout(timer); timer = setTimeout(persist, 700);
+      $('#save-state').classList.add('saving'); $('#save-text').textContent = 'Unsaved changes';
+      clearTimeout(timer); timer = setTimeout(persist, 1500);
+      renderPreviews();
     }
+    function warnLeave(e) { if (timer) { e.preventDefault(); e.returnValue = ''; } }
+    window.addEventListener('beforeunload', warnLeave);
     function persist() {
       timer = null;
       if (p._unsaved) {
@@ -901,7 +1028,7 @@
       renderPub(); refreshBadges();
     }
     var tick = setInterval(function () { if (!timer && !p._unsaved) $('#save-text').textContent = 'Saved in this browser ' + ago(p.updatedAt); }, 15000);
-    current.cleanup = function () { clearInterval(tick); if (timer) { clearTimeout(timer); persist(); } if (editor) editor.destroy(); };
+    current.cleanup = function () { clearInterval(tick); window.removeEventListener('beforeunload', warnLeave); if (timer) { clearTimeout(timer); persist(); } if (editor) editor.destroy(); };
 
     // The title wraps like the heading it becomes; Enter moves on to the body.
     function fitTitle() { var t = $('#title'); t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
@@ -933,16 +1060,43 @@
     $('#meta').addEventListener('input', function (e) { p.draft.metaDescription = e.target.value; counts(); changed(); });
 
     function renderFeat() {
-      var src = p.draft.cover;
-      $('#feat-box').innerHTML = (src ? '<div class="feat"><img src="' + esc(src) + '" alt="Featured image preview"></div>' : '<p class="hint">No featured image.</p>') +
+      var src = p.draft.cover, alt = coverAlt(p.draft);
+      $('#feat-box').innerHTML = (src ? '<div class="feat"><img src="' + esc(src) + '" alt="' + esc(alt || 'Featured image preview') + '"></div>' +
+          '<div class="field"><label class="lbl" for="cover-alt">Alt text (required to publish)</label><input class="input" id="cover-alt" maxlength="200" value="' + esc(alt) + '" aria-describedby="cover-alt-hint"><p class="hint' + (alt.trim() ? '' : ' err') + '" id="cover-alt-hint">' + (alt.trim() ? 'Screen readers say this, and it shows if the image fails to load.' : 'Describe the image: the post cannot go live without it.') + '</p></div>'
+        : '<p class="hint">No featured image.</p>') +
         '<div class="row"><button type="button" class="btn btn-outline btn-sm" data-act="pick-cover">' + icon('image') + (src ? 'Change' : 'Choose image') + '</button>' +
         (src ? '<button type="button" class="btn btn-ghost btn-sm" data-act="remove-cover">Remove</button>' : '') + '</div>';
+      var inp = $('#cover-alt');
+      if (inp) inp.addEventListener('input', function () {
+        p.draft.coverAlt = inp.value;
+        var ok = !!inp.value.trim(), hint = $('#cover-alt-hint');
+        hint.classList.toggle('err', !ok);
+        hint.textContent = ok ? 'Screen readers say this, and it shows if the image fails to load.' : 'Describe the image: the post cannot go live without it.';
+        changed();
+      });
     }
     $('#feat-box').addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]'); if (!b) return;
-      if (b.getAttribute('data-act') === 'pick-cover') pickMedia(function (m) { p.draft.cover = m.src; renderFeat(); changed(); });
-      else { p.draft.cover = ''; renderFeat(); changed(); }
+      if (b.getAttribute('data-act') === 'pick-cover') pickMedia(function (m) { p.draft.cover = m.src; p.draft.coverAlt = m.alt || ''; renderFeat(); changed(); });
+      else if (b.getAttribute('data-act') === 'remove-cover') { p.draft.cover = ''; p.draft.coverAlt = ''; renderFeat(); changed(); }
     });
+
+    // How the post looks in a search result and a share card (the kit's
+    // PostPreviews, from lib/admin/previews.ts), updated as you type.
+    function renderPreviews() {
+      var d = p.draft, title = d.title.trim(), meta = d.metaDescription.trim(), ex = d.excerpt.trim(), warn = [];
+      if (!title) warn.push('Add a title.');
+      else if (title.length > 60) warn.push('The title is ' + title.length + ' characters; search results show about 60.');
+      if (!meta) warn.push(ex ? 'No search description: search engines may use the excerpt or pick their own text.' : 'No search description or excerpt: search engines will pick their own text.');
+      if (!d.cover) warn.push('No featured image: most networks show a text-only card.');
+      var sdesc = clipText(meta || ex, 160), cdesc = clipText(ex || meta, 200);
+      $('#prev-box').innerHTML =
+        '<p class="pv-lbl">Search result</p>' +
+        '<div class="pv-search"><div class="pv-crumb">' + esc(SITE_HOST + ' › blog › ' + (d.slug || 'your-slug')) + '</div><div class="pv-title">' + esc(clipText(title || 'Untitled post', 60)) + '</div>' + (sdesc ? '<div class="pv-desc">' + esc(sdesc) + '</div>' : '') + '</div>' +
+        '<p class="pv-lbl">Share card</p>' +
+        '<div class="pv-social">' + (d.cover ? '<img src="' + esc(d.cover) + '" alt="' + esc(coverAlt(d)) + '">' : '') + '<div class="pv-body"><div class="pv-domain">' + esc(SITE_HOST.toUpperCase()) + '</div><div class="pv-title">' + esc(clipText(title || 'Untitled post', 90)) + '</div>' + (cdesc ? '<div class="pv-desc">' + esc(cdesc) + '</div>' : '') + '</div></div>' +
+        (warn.length ? '<ul class="pv-warn">' + warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '');
+    }
 
     function renderPub() {
       var s = p._unsaved ? 'draft' : postState(p);
@@ -1024,15 +1178,15 @@
         confirmDialog({ title: 'Delete this post?', desc: '<strong>' + esc(p.draft.title || 'Untitled post') + '</strong> is deleted for good.', confirm: 'Delete post', danger: true, onConfirm: function () { if (timer) clearTimeout(timer); timer = null; db.posts = db.posts.filter(function (x) { return x.id !== p.id; }); audit('blog_post.delete', 'blog_post', p.id, { title: p.draft.title }); save(); toast('Post deleted.'); go('#/posts'); } });
       }
     });
-    renderFeat(); renderPub(); counts(); checkSlug(); syncToolbar();
+    renderFeat(); renderPub(); renderPreviews(); counts(); checkSlug(); syncToolbar();
     if (isNew) $('#title').focus();
   }
   function toolbarHtml() {
     var b = function (cmd, label, text, pressed) { return '<button type="button" class="tb" data-cmd="' + cmd + '" aria-label="' + esc(label) + '" title="' + esc(label) + '"' + (pressed ? ' aria-pressed="false"' : '') + '>' + text + '</button>'; };
-    return b('bold', 'Bold', '<strong>B</strong>', 1) + b('italic', 'Italic', '<em>I</em>', 1) +
+    return b('bold', 'Bold', '<strong>B</strong>', 1) + b('italic', 'Italic', '<em>I</em>', 1) + b('strike', 'Strikethrough', '<s>S</s>', 1) + b('code', 'Inline code', '<span class="mono">&lt;/&gt;</span>', 1) +
       '<span class="sep" aria-hidden="true"></span>' + b('h2', 'Heading 2', 'H2', 1) + b('h3', 'Heading 3', 'H3', 1) +
-      '<span class="sep" aria-hidden="true"></span>' + b('bulletList', 'Bulleted list', '&bull; List', 1) + b('orderedList', 'Numbered list', '1. List', 1) + b('blockquote', 'Quote', '&ldquo; Quote', 1) +
-      '<span class="sep" aria-hidden="true"></span>' + b('link', 'Link', 'Link', 1) + b('image', 'Insert image', 'Image') +
+      '<span class="sep" aria-hidden="true"></span>' + b('bulletList', 'Bulleted list', '&bull; List', 1) + b('orderedList', 'Numbered list', '1. List', 1) + b('blockquote', 'Quote', '&ldquo; Quote', 1) + b('codeBlock', 'Code block', '<span class="mono">{ }</span>', 1) + b('hr', 'Divider line', 'HR') +
+      '<span class="sep" aria-hidden="true"></span>' + b('link', 'Link', 'Link', 1) + b('image', 'Insert image', 'Image') + b('alt', 'Alt text for the selected image', 'Alt text') +
       '<span class="sep" aria-hidden="true"></span>' + b('undo', 'Undo', '&#8630;') + b('redo', 'Redo', '&#8631;');
   }
   function linkDialog(editor) {
@@ -1528,7 +1682,7 @@
       '<div class="stack">' +
       '<section class="card" aria-labelledby="st-theme"><h2 id="st-theme">Appearance</h2><fieldset class="row fieldset-reset"><legend class="sr-only">Theme</legend>' +
         [['light', 'Light'], ['dark', 'Dark'], ['system', 'Match my device']].map(function (o) { return '<label class="check"><input type="radio" name="theme" value="' + o[0] + '"' + (pref === o[0] ? ' checked' : '') + '> ' + o[1] + '</label>'; }).join('') +
-      '</fieldset></section>' +
+      '</fieldset><p class="hint mt-8">The kit\'s admin has the same three choices since 1.3.0, kept in a cookie so the page never flashes the wrong theme.</p></section>' +
       '<section class="card" aria-labelledby="st-2fa"><h2 id="st-2fa">Two-factor authentication</h2>' +
         (db.mfaEnabled ? '<p>' + chip('on', 'On') + ' &nbsp;Authenticator app. <span class="muted">' + plural(db.mfaCodes.length, 'recovery code', 'recovery codes') + ' left.</span></p><div class="row"><button type="button" class="btn btn-outline" data-act="regen">' + icon('key') + 'New recovery codes</button><button type="button" class="btn btn-ghost" data-act="disable-2fa">Turn off two-factor</button></div>'
           : '<p>' + chip('off', 'Off') + ' &nbsp;<span class="muted">Required for every admin after the grace period.</span></p><button type="button" class="btn btn-primary" data-act="enable-2fa">' + icon('shield') + 'Set up two-factor</button>') +
@@ -1538,6 +1692,18 @@
         '<div class="field"><label class="lbl" for="pw-new">New password</label><input class="input" id="pw-new" type="password" autocomplete="new-password" aria-describedby="pw-rules"><ul class="pw-rules" id="pw-rules"><li data-r="len">At least 12 characters</li><li data-r="let">A letter</li><li data-r="num">A number</li><li data-r="sym">A symbol</li></ul></div>' +
         '<div class="field"><label class="lbl" for="pw-conf">Confirm new password</label><input class="input" id="pw-conf" type="password" autocomplete="new-password"></div>' +
         '<p class="hint err" id="pw-err" role="alert"></p><button class="btn btn-primary" type="submit">Update password</button></form></section>' +
+      '<section class="card" aria-labelledby="st-server"><h2 id="st-server">What the server does <span class="tag-new">New in 1.3.0</span></h2>' +
+        '<p class="muted">Real in the kit\'s source. These run on the server and in the database, so this demo describes them instead of running them.</p>' +
+        '<ul class="plain-list">' + [
+          'Security headers on every page, and a Content Security Policy on the admin that reports problems until you switch it to enforce.',
+          'Every form and button that changes data refuses a request sent from another site.',
+          'Writing help from AI is limited per admin (20 calls in 10 minutes by default), and what it returns is checked before the editor sees it.',
+          'The redirect counter is limited per visitor and per redirect, so nobody can inflate it.',
+          'The audit log is append-only: the database refuses edits and deletes, apart from clearing entries older than the retention window (24 months by default).',
+          'Images uploaded for a post stay private until the post goes live.',
+          'With review required switched on, the database itself refuses a publish that a second admin has not approved.',
+          'New recovery codes and turning two-factor off both need your password.'
+        ].map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></section>' +
       '<section class="card" aria-labelledby="st-demo"><h2 id="st-demo">Demo controls</h2><p class="muted">Signed in as ' + esc(u.name) + ' (' + esc(u.email) + '). The kit shows Team and the Audit log to super admins only; switch roles to see the difference.</p>' +
         '<div class="row"><label class="lbl" for="viewas">View the admin as</label><select class="input w-auto" id="viewas">' + opts([['super_admin', 'Super admin'], ['admin', 'Admin']], role()) + '</select></div>' +
         '<div class="row mt-16"><button type="button" class="btn btn-danger" data-act="reset-demo">' + icon('reset') + 'Reset demo data</button><span class="muted">Puts every post, image, person and log entry back to the original sample.</span></div></section>' +
@@ -1560,7 +1726,13 @@
     $('.main').addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]'); if (!b) return;
       var act = b.getAttribute('data-act');
-      if (act === 'regen') confirmDialog({ title: 'Make new recovery codes?', desc: 'Your old codes stop working right away.', confirm: 'Make new codes', onConfirm: function () { db.mfaCodes = recoveryCodes(); audit('auth.mfa.regenerated_codes', 'user', me().id); save(); showCodes('Your new recovery codes', 'Each code works once. They are shown only now.', function () { render(true); }); } });
+      // 1.3.0: new codes need the password first, as turning two-factor off does.
+      if (act === 'regen') openModal({
+        title: 'Make new recovery codes?', desc: 'Confirm your password. Your old codes stop working right away.',
+        body: '<div class="field"><label class="lbl" for="regen-pw">Password</label><input class="input" id="regen-pw" type="password" autocomplete="current-password" autofocus><p class="hint">Any value works in the demo; the kit checks it against your account.</p><p class="hint err" id="regen-err" role="alert"></p></div>',
+        actions: '<button type="button" class="btn btn-outline" data-close>Cancel</button><button type="submit" class="btn btn-primary">Make new codes</button>',
+        onSubmit: function (f, close) { if (!$('#regen-pw', f).value) { $('#regen-err', f).textContent = 'Enter your password.'; return; } close(); db.mfaCodes = recoveryCodes(); audit('auth.mfa.regenerated_codes', 'user', me().id); save(); showCodes('Your new recovery codes', 'Each code works once. They are shown only now.', function () { render(true); }); }
+      });
       else if (act === 'disable-2fa') openModal({
         title: 'Turn off two-factor?', desc: 'Confirm your password. Your recovery codes are deleted too.',
         body: '<div class="field"><label class="lbl" for="dis-pw">Password</label><input class="input" id="dis-pw" type="password" autocomplete="current-password" autofocus><p class="hint">Any value works in the demo.</p><p class="hint err" id="dis-err" role="alert"></p></div>',

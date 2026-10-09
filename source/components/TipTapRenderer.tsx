@@ -80,6 +80,10 @@ function renderMarks(text: string, marks?: TipTapMark[]): React.ReactNode {
         return <strong className="font-bold text-text-primary">{acc}</strong>
       case 'italic':
         return <em>{acc}</em>
+      case 'strike':
+        return <s>{acc}</s>
+      case 'code':
+        return <code className="rounded bg-bg-elevated px-1.5 py-0.5 text-[0.9em]">{acc}</code>
       case 'link': {
         const raw = (mark.attrs?.href as string) || ''
         // Scheme allowlist: block javascript:/data:/vbscript: URIs (stored XSS).
@@ -132,6 +136,15 @@ function renderNode(node: TipTapNode, index: number): React.ReactNode {
       return <ol key={index} className="list-decimal pl-6 mb-6 space-y-2 text-text-secondary text-[17px]">{children}</ol>
     case 'listItem':
       return <li key={index} className="leading-[1.7]">{children}</li>
+    case 'codeBlock':
+      // The text is rendered as text (React escapes it), never as HTML.
+      return (
+        <pre key={index} className="my-8 overflow-x-auto rounded-lg bg-bg-elevated p-4 text-sm leading-relaxed">
+          <code>{node.content?.map((c) => c.text || '').join('')}</code>
+        </pre>
+      )
+    case 'horizontalRule':
+      return <hr key={index} className="my-10 border-border" />
     case 'image': {
       const src = node.attrs?.src as string
       const alt = (node.attrs?.alt as string) || ''

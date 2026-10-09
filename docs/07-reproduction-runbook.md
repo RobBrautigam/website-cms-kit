@@ -39,9 +39,9 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 
 Open Supabase -> SQL Editor, paste the entire contents of `source/supabase/migrations/000_admin_cms_schema.sql`, and run it. This creates `user_roles`, the `SECURITY DEFINER` role helpers, all content tables with hardened RLS, the audit log, the MFA recovery-code store, and the `blog-images` Storage bucket with its write policies.
 
-Then run `source/supabase/migrations/001_staging_and_approval.sql` the same way. It adds the private `blog_post_staged_changes` table, its RLS, the review trigger and `publish_staged_posts()` ([docs/10](10-staging-and-approval.md)). Both files are safe to run again.
+Then run `source/supabase/migrations/001_staging_and_approval.sql` the same way. It adds the private `blog_post_staged_changes` table, its RLS, the review trigger and `publish_staged_posts()` ([docs/10](10-staging-and-approval.md)). Then run `002_hardening.sql`: the append-only audit trigger, the rate-limit table, the deferrable slug, the opt-in two-person lock and the private bucket for staged images ([docs/11](11-hardening-and-everyday-comforts.md)). All three files are safe to run again; if you ever re-run 000 or 001, run 002 after it.
 
-To check both migrations before you touch a real project, run the database tests on an in-memory Postgres (Node 22.18 or later, no Supabase project or Docker needed):
+To check all three migrations before you touch a real project, run the database tests on an in-memory Postgres (Node 22.18 or later, no Supabase project or Docker needed):
 
 ```bash
 cd source/supabase/tests

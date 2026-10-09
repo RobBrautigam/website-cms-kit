@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/require'
 import { isLastActiveSuperAdmin } from '@/lib/auth/team-queries'
 import { recordAdminAction } from '@/lib/auth/audit'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 const Body = z.object({ role: z.enum(['super_admin', 'admin']) })
 
@@ -17,6 +18,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireSuperAdmin()
 
   const { id: targetUserId } = await params

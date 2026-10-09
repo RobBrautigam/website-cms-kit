@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/require'
 import { recordAdminAction } from '@/lib/auth/audit'
+import { crossSiteRefusal, siteOriginOf } from '@/lib/security/request-origin'
 
 /**
  * POST /api/admin/users/invite
@@ -26,19 +27,9 @@ const InviteBody = z.object({
   role: z.enum(['super_admin', 'admin']).default('admin'),
 })
 
-function siteOrigin(request: NextRequest): string {
-  // Prefer the Forwarded host header (set by reverse proxies), then
-  // X-Forwarded-Host, then the URL host. Falls back to the request URL.
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const protoHeader = request.headers.get('x-forwarded-proto')
-  if (forwardedHost) {
-    const proto = protoHeader || 'https'
-    return `${proto}://${forwardedHost}`
-  }
-  return new URL(request.url).origin
-}
-
 export async function POST(request: NextRequest) {
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireSuperAdmin() // throws redirect if caller isn't a super_admin
 
   let body: unknown
@@ -61,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const { email, name, role } = parsed.data
   const serviceClient = createServiceClient()
-  const origin = siteOrigin(request)
+  const origin = siteOriginOf(request)
   const redirectTo = `${origin}/admin/reset-password?context=invite`
 
   const { data: invited, error: inviteError } =

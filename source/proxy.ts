@@ -3,6 +3,8 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { lookupRedirect, recordHit } from "@/lib/redirects/lookup";
 import { buildRedirectTarget } from "@/lib/redirects/build-target";
 import { isBot } from "@/lib/redirects/bot-detect";
+import { clientAddress } from "@/lib/security/rate-limit";
+import { cspFor, forwardWithCsp } from "@/lib/security/csp";
 
 /**
  * Next.js 16 Proxy (the file formerly known as middleware.ts).
@@ -25,6 +27,10 @@ import { isBot } from "@/lib/redirects/bot-detect";
  *
  *   1. Supabase auth gating for /admin/*: refresh the session cookie and bounce
  *      unauthenticated requests to /admin/login. See lib/supabase/middleware.ts.
+ *
+ *   2. The Content Security Policy, with a fresh nonce per request, on /admin
+ *      (and every page with CSP_SCOPE=site). Report-only until CSP_MODE=enforce.
+ *      See lib/security/csp.ts; the fixed headers are in next.config.ts.
  */
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -60,9 +66,10 @@ export async function proxy(request: NextRequest) {
         // External destinations record the hit via after() so logging never
         // adds latency. Bot UAs are filtered to keep hit_count meaningful.
         if (isExternal && !isBot(request.headers.get("user-agent"))) {
+          const caller = clientAddress(request.headers);
           after(async () => {
             try {
-              await recordHit(hit.id);
+              await recordHit(hit.id, caller);
             } catch {
               // Best-effort.
             }
@@ -76,11 +83,18 @@ export async function proxy(request: NextRequest) {
   }
 
   // 1. Admin auth gating.
+  const csp = cspFor(pathname);
+
   if (pathname.startsWith("/admin")) {
-    return await updateSession(request);
+    return await updateSession(request, csp);
   }
 
-  return NextResponse.next();
+  if (!csp) return NextResponse.next();
+  const res = NextResponse.next({
+    request: { headers: forwardWithCsp(request.headers, csp) },
+  });
+  res.headers.set(csp.name, csp.value);
+  return res;
 }
 
 export const config = {

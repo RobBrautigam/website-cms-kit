@@ -1,13 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { forwardWithCsp, type RequestCsp } from '@/lib/security/csp'
 
 /**
  * Refreshes the Supabase auth session on every /admin/* request and gates
  * access. Called from proxy.ts. Splitting this out keeps the proxy readable
  * and lets you unit-test the gating logic in isolation.
  */
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+export async function updateSession(request: NextRequest, csp: RequestCsp | null = null) {
+  // Forward the request with its (possibly refreshed) cookies and, when there
+  // is one, the policy whose nonce Next.js stamps on its scripts.
+  const forward = () =>
+    NextResponse.next({ request: { headers: forwardWithCsp(request.headers, csp) } })
+  let supabaseResponse = forward()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,7 +31,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = forward()
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -82,6 +87,7 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  if (csp) supabaseResponse.headers.set(csp.name, csp.value)
   return supabaseResponse
 }
 

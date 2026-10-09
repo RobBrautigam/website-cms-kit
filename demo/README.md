@@ -10,7 +10,7 @@ Sign in with the pre-filled form (any password works); the two-factor code is `1
 
 ## In the kit today, and what is proposed
 
-Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar or on the page (a "Partly proposed" note where a page mixes the two). Staging and approval moved from proposed to real in 1.2.0.
+Most of the demo mirrors code in the kit's source today. A few screens preview features that are proposed but not built; the demo marks each one **Proposed** in the sidebar or on the page (a "Partly proposed" note where a page mixes the two). Staging and approval moved from proposed to real in 1.2.0. Everything 1.3.0 added is real in the source: the editor's alt text prompt and required featured-image alt, the strike, inline code, code block and divider buttons, the unsaved-changes status and warning, the search and share-card preview, bulk actions on the posts list and the password before new recovery codes. The server-side hardening (headers, the same-site check, rate limits, the append-only audit log, private staged images and the two-person lock) cannot run in a browser-only demo, so Settings describes it in a card marked New in 1.3.0. One difference: the kit autosaves a draft to the database and a live post's edits to its staged copy, while the demo keeps everything in your browser.
 
 | | |
 |---|---|
@@ -46,7 +46,7 @@ It works at phone and desktop widths, in light and dark themes, with the keyboar
 
 | | |
 |---|---|
-| ![Posts list](screenshots/posts-light-desktop.png) | ![Editor](screenshots/editor-light-desktop.png) |
+| ![Posts list with the bulk bar](screenshots/posts-bulk-light-desktop.png) | ![Editor](screenshots/editor-light-desktop.png) |
 | ![Staging page with staged changes](screenshots/staging-light-desktop.png) | ![Live and staged side by side](screenshots/staging-compare-light-desktop.png) |
 | ![Staging in the dark theme](screenshots/staging-dark-desktop.png) | ![Audit log](screenshots/audit-log-light-desktop.png) |
 | ![Posts in the dark theme](screenshots/posts-dark-desktop.png) | ![Sign-in](screenshots/login-light-desktop.png) |

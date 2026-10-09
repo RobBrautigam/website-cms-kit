@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { draftMode } from 'next/headers'
 import { requireAdmin } from '@/lib/auth/require'
 import { recordAdminAction } from '@/lib/auth/audit'
-import { isSameOriginPost, publicOrigin, safePreviewPath } from '@/lib/staging/rules'
+import { safePreviewPath } from '@/lib/staging/rules'
+import { crossSiteRefusal } from '@/lib/security/request-origin'
 
 /**
  * POST /api/admin/preview  (form field `path`, default `/`)
@@ -16,11 +17,8 @@ import { isSameOriginPost, publicOrigin, safePreviewPath } from '@/lib/staging/r
  * admin session on every request. See docs/10-staging-and-approval.md.
  */
 export async function POST(request: NextRequest) {
-  const h = request.headers
-  const site = publicOrigin(h.get('x-forwarded-host'), h.get('x-forwarded-proto'), h.get('host'), request.url)
-  if (!isSameOriginPost(h.get('origin'), h.get('sec-fetch-site'), site)) {
-    return NextResponse.json({ error: 'Cross-site request refused.' }, { status: 403 })
-  }
+  const refused = crossSiteRefusal(request)
+  if (refused) return refused
   await requireAdmin()
 
   const form = await request.formData().catch(() => null)

@@ -8,6 +8,8 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/require";
+import { altTextRefusal } from "@/lib/admin/alt-text";
+import { promoteImages } from "@/lib/staging/promote-images";
 import { recordAdminAction } from "@/lib/auth/audit";
 import {
   ok,
@@ -209,11 +211,16 @@ export async function publishStaged(
   const supabase = await createServerSupabaseClient();
   const { data: picked, error: readError } = await supabase
     .from("blog_post_staged_changes")
-    .select("id, post_id, title, slug, review_status, staged_by, approved_by, post:blog_posts(slug)")
+    .select("id, post_id, title, slug, review_status, staged_by, approved_by, featured_image_url, featured_image_alt, body, post:blog_posts(slug)")
     .in("id", ids);
   const readWrapped = wrapSupabaseError(readError);
   if (readWrapped) return readWrapped;
-  const rows = (picked ?? []) as unknown as (StageRow & { post: { slug: string } | null })[];
+  const rows = (picked ?? []) as unknown as (StageRow & {
+    post: { slug: string } | null;
+    featured_image_url: string | null;
+    featured_image_alt: string | null;
+    body: unknown;
+  })[];
   if (rows.length !== ids.length)
     return err("Some picked changes were not found (published by someone else, or discarded). Nothing was published.", "not_found");
 
@@ -225,6 +232,21 @@ export async function publishStaged(
   }));
   const check = checkPublishSelection(summaries);
   if (!check.ok) return err(check.message, "validation");
+
+  // Nothing goes live without alt text, and its images go public first
+  // (they wait in the private staged bucket until now; lib/staging/images.ts).
+  for (const r of rows) {
+    const missing = altTextRefusal({
+      featuredImageUrl: r.featured_image_url,
+      featuredImageAlt: r.featured_image_alt,
+      body: r.body,
+    });
+    if (missing) return err(`"${r.title}": ${missing} Nothing was published.`, "validation");
+  }
+  for (const r of rows) {
+    const failed = await promoteImages(r);
+    if (failed) return err(failed, "server");
+  }
 
   const { error } = await supabase.rpc("publish_staged_posts", { stage_ids: ids });
   const wrapped = wrapSupabaseError(error, SLUG_TAKEN);
@@ -279,5 +301,27 @@ export async function publishNow(
   const published = await publishStaged([staged.data!.stageId]);
   if (!published.ok)
     return err(`${published.error} Your changes are saved as a staged copy.`, published.code);
+  return ok();
+}
+
+/**
+ * Before the editor saves a post as published or scheduled directly (review
+ * off, a post that is not live yet): check its alt text and make its staged
+ * images public. The editor then writes the row with the admin's session.
+ */
+export async function prepareToGoLive(content: {
+  featured_image_url?: string | null;
+  featured_image_alt?: string | null;
+  body?: unknown;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  const missing = altTextRefusal({
+    featuredImageUrl: content.featured_image_url,
+    featuredImageAlt: content.featured_image_alt,
+    body: content.body,
+  });
+  if (missing) return err(missing, "validation");
+  const failed = await promoteImages(content);
+  if (failed) return err(failed, "server");
   return ok();
 }

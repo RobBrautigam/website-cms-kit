@@ -7,8 +7,11 @@ import {
   unenrollAllFactors,
 } from "@/lib/auth/mfa";
 import { recordAdminAction } from "@/lib/auth/audit";
+import { crossSiteRefusal } from "@/lib/security/request-origin";
 
 export async function POST(req: Request) {
+  const refused = crossSiteRefusal(req);
+  if (refused) return refused;
   const { user } = await requirePartialAdmin();
   let body: unknown;
   try {

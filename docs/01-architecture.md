@@ -87,6 +87,7 @@ source/
   app/globals.css               neutral design tokens + component classes (re-theme here)
   supabase/migrations/000_admin_cms_schema.sql   the whole schema + RLS
   supabase/migrations/001_staging_and_approval.sql   staged post changes + RLS + review trigger
+  supabase/migrations/002_hardening.sql   append-only audit, rate limits, two-person lock, staged images
   supabase/tests/               database tests on an in-memory Postgres (npm test)
 ```
 

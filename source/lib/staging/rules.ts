@@ -33,7 +33,9 @@ export interface StagingActions {
 
 /**
  * Must match public.staging_review_required() in migration 001. Turning on
- * mandatory review means changing both, and hiding "Publish now".
+ * mandatory review means changing both, and hiding "Publish now". With the
+ * database switch on, migration 002's two-person lock makes it real: a live
+ * post then changes only through an approved staged change.
  */
 export const REVIEW_REQUIRED = false
 
@@ -135,39 +137,6 @@ export function safePreviewPath(raw: unknown): string | null {
   if (raw.startsWith('//')) return null
   if (/[\\\u0000-\u001f\u007f]/.test(raw)) return null
   return raw
-}
-
-/**
- * The preview routes change a cookie, so they take POST from a form on this
- * site only (the same check Keystatic's preview exit makes). `origin` is the
- * request's Origin header, `fetchSite` its Sec-Fetch-Site header.
- */
-export function isSameOriginPost(origin: string | null, fetchSite: string | null, requestUrl: string): boolean {
-  if (origin && origin !== 'null') return origin === new URL(requestUrl).origin
-  return fetchSite === 'same-origin'
-}
-
-/**
- * The site's public origin. Under `next start` behind a proxy, a route's
- * `request.url` carries the server's bind address (http://localhost:3000),
- * not the address the browser used, so compare against the proxy's
- * X-Forwarded-Host (first value), then the Host header, then the URL.
- * A cross-site form cannot set either header, so this does not weaken the
- * same-origin check.
- */
-export function publicOrigin(
-  forwardedHost: string | null,
-  forwardedProto: string | null,
-  host: string | null,
-  requestUrl: string
-): string {
-  const first = (v: string | null) => (v ? v.split(',')[0].trim() : '')
-  const url = new URL(requestUrl)
-  const fHost = first(forwardedHost)
-  if (fHost) return `${first(forwardedProto) || 'https'}://${fHost}`
-  const h = first(host)
-  if (h) return `${url.protocol}//${h}`
-  return url.origin
 }
 
 /**

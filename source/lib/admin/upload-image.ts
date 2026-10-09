@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { PUBLIC_BUCKET, STAGED_BUCKET } from '@/lib/staging/images'
 
 /**
  * The one upload path for admin images (the editor's inline images and the
@@ -6,7 +7,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *
  * The browser checks here are for a fast, friendly error. The real limits are
  * server-side: the bucket's own size and MIME settings, and the Storage RLS
- * policies in the migration (section 9) that only let an active admin write.
+ * policies in the migrations that only let an active admin write.
+ *
+ * Since 1.3.0 a new image is private until its post goes live: the file goes
+ * to the staged bucket, and the URL returned is the public URL it will have
+ * once publishing copies it across (lib/staging/images.ts). The admin
+ * screens show it meanwhile through /api/admin/staged-image.
  */
 export const IMAGE_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -16,7 +22,6 @@ export const IMAGE_TYPES: Record<string, string> = {
 }
 export const IMAGE_ACCEPT = Object.keys(IMAGE_TYPES).join(',')
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-const BUCKET = 'blog-images'
 
 export type UploadResult = { url: string } | { error: string }
 
@@ -46,7 +51,7 @@ export async function uploadBlogImage(
   if (file.size > MAX_IMAGE_BYTES) return { error: 'Images must be 5 MB or smaller.' }
 
   const path = newImagePath(ext)
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+  const { error } = await supabase.storage.from(STAGED_BUCKET).upload(path, file, {
     cacheControl: '31536000',
     contentType: file.type,
     upsert: false,
@@ -55,6 +60,6 @@ export async function uploadBlogImage(
 
   const {
     data: { publicUrl },
-  } = supabase.storage.from(BUCKET).getPublicUrl(path)
+  } = supabase.storage.from(PUBLIC_BUCKET).getPublicUrl(path)
   return { url: publicUrl }
 }

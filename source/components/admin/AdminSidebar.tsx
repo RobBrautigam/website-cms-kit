@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client'
 import ChangePassword from './ChangePassword'
 import { APP_VERSION } from '@/lib/version'
 import { LogoMark } from '@/components/LogoMark'
+import { useTheme } from '@/components/ThemeProvider'
+import { themeLabel } from '@/lib/admin/theme'
 
 type NavItem = {
   href: string
@@ -192,6 +194,8 @@ export default function AdminSidebar({
             </p>
           </div>
 
+          <ThemeToggle />
+
           <button
             onClick={() => setShowPasswordModal(true)}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-text-secondary cursor-pointer hover:text-text-primary hover:bg-accent/10 active:scale-[0.98] transition-all duration-150"
@@ -216,5 +220,22 @@ export default function AdminSidebar({
         <ChangePassword onClose={() => setShowPasswordModal(false)} />
       )}
     </>
+  )
+}
+
+/** Cycles the admin theme: match system, light, dark. */
+function ThemeToggle() {
+  const { theme, toggle } = useTheme()
+  const icon = theme === 'dark' ? '🌙' : theme === 'light' ? '☀️' : '🖥️'
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`${themeLabel(theme)}. Change theme`}
+      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-text-secondary cursor-pointer hover:text-text-primary hover:bg-accent/10 active:scale-[0.98] transition-all duration-150"
+    >
+      <span className="w-4 text-center shrink-0" aria-hidden="true">{icon}</span>
+      {themeLabel(theme)}
+    </button>
   )
 }

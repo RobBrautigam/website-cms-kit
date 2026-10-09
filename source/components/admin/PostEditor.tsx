@@ -7,7 +7,10 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { createClient } from '@/lib/supabase/client'
 import { IMAGE_ACCEPT, uploadBlogImage } from '@/lib/admin/upload-image'
 import { isSafeHref } from '@/lib/safe-href'
+import { useEffect, useRef } from 'react'
 import { getWordCount } from '@/lib/utils'
+import { bodyImagesMissingAlt } from '@/lib/admin/alt-text'
+import { stagedImageFallback } from '@/lib/staging/images'
 
 interface PostEditorProps {
   content: Record<string, unknown>
@@ -37,12 +40,22 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
           alert(result.error)
           return
         }
-        editor?.chain().focus().setImage({ src: result.url }).run()
+        // Alt text is required before the post goes live; ask for it now,
+        // while the writer knows what the image shows.
+        const alt = prompt('Describe this image for people who cannot see it (alt text):')?.trim() ?? ''
+        editor?.chain().focus().setImage({ src: result.url, alt }).run()
       } catch {
         alert('Upload failed. Please try again.')
       }
     }
     input.click()
+  }
+
+  function editAlt() {
+    const current = (editor?.getAttributes('image').alt as string | undefined) ?? ''
+    const alt = prompt('Alt text for this image:', current)
+    if (alt === null) return
+    editor?.chain().focus().updateAttributes('image', { alt: alt.trim() }).run()
   }
 
   function addLink() {
@@ -72,6 +85,12 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={btnClass(editor?.isActive('italic') || false)}>
         <em>I</em>
       </button>
+      <button type="button" aria-label="Strikethrough" onClick={() => editor?.chain().focus().toggleStrike().run()} className={btnClass(editor?.isActive('strike') || false)}>
+        <s>S</s>
+      </button>
+      <button type="button" aria-label="Inline code" onClick={() => editor?.chain().focus().toggleCode().run()} className={btnClass(editor?.isActive('code') || false)}>
+        <code>{'<>'}</code>
+      </button>
       <div className="w-px bg-border mx-1" />
       <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className={btnClass(editor?.isActive('bulletList') || false)}>
         List
@@ -82,6 +101,12 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className={btnClass(editor?.isActive('blockquote') || false)}>
         Quote
       </button>
+      <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className={btnClass(editor?.isActive('codeBlock') || false)}>
+        Code
+      </button>
+      <button type="button" aria-label="Divider" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className={btnClass(false)}>
+        HR
+      </button>
       <div className="w-px bg-border mx-1" />
       <button type="button" onClick={addLink} className={btnClass(editor?.isActive('link') || false)}>
         Link
@@ -89,6 +114,11 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       <button type="button" onClick={addImage} className={btnClass(false)}>
         Image
       </button>
+      {editor?.isActive('image') && (
+        <button type="button" onClick={editAlt} className={btnClass(true)}>
+          Alt text
+        </button>
+      )}
     </div>
   )
 }
@@ -126,16 +156,46 @@ export default function PostEditor({ content, onChange }: PostEditorProps) {
     },
   })
 
-  const wordCount = editor ? getWordCount(editor.getJSON() as Record<string, unknown>) : 0
+  const json = editor ? (editor.getJSON() as Record<string, unknown>) : null
+  const wordCount = json ? getWordCount(json) : 0
   const readingTime = Math.max(1, Math.ceil(wordCount / 238))
+  const missingAlt = json ? bodyImagesMissingAlt(json) : 0
+
+  // A new image is private until the post goes live, so its final URL does
+  // not load yet. Show it through the admin's signed-link route instead. Only
+  // the <img> element changes; ProseMirror ignores changes inside a leaf
+  // node, so the stored URL stays the final one.
+  const contentRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    // 'error' does not bubble, so listen in the capture phase.
+    const onError = (e: Event) => {
+      const img = e.target
+      if (!(img instanceof HTMLImageElement) || img.dataset.stagedFallback) return
+      const fallback = stagedImageFallback(img.getAttribute('src'))
+      if (!fallback) return
+      img.dataset.stagedFallback = '1'
+      img.src = fallback
+    }
+    el.addEventListener('error', onError, true)
+    return () => el.removeEventListener('error', onError, true)
+  }, [])
 
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-bg-white">
       <EditorToolbar editor={editor} />
-      <EditorContent editor={editor} />
-      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary flex gap-4 bg-bg-card/30">
+      <div ref={contentRef}>
+        <EditorContent editor={editor} />
+      </div>
+      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary flex flex-wrap gap-4 bg-bg-card/30">
         <span>{wordCount.toLocaleString()} words</span>
         <span>{readingTime} min read</span>
+        {missingAlt > 0 && (
+          <span className="text-amber-700" role="status">
+            {missingAlt === 1 ? '1 image needs' : `${missingAlt} images need`} alt text (select it, then Alt text)
+          </span>
+        )}
       </div>
     </div>
   )
