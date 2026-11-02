@@ -1,11 +1,12 @@
 import { requireAdmin } from '@/lib/auth/require'
 import SitemapView, { type RouteGroup } from '@/components/admin/SitemapView'
+import { PUBLIC_ROUTES } from '@/lib/seo/routes'
 
 export const dynamic = 'force-dynamic'
 
-// Manually-maintained admin route list. When you add a new admin or core page,
-// add it here. The canonical sitemap consumed by search engines is generated
-// separately at `src/app/sitemap.ts`.
+// The core pages come from the public page registry (lib/seo/routes.ts), the
+// same list `app/sitemap.ts` and `app/llms.txt` read, so the three cannot
+// drift. The admin pages below are maintained here by hand.
 //
 // To wire in dynamic routes (blog posts, jobs, etc.) from your data source,
 // fetch them in this server component and map them into a RouteGroup the same
@@ -17,14 +18,7 @@ export default async function SitemapPage() {
   const groups: RouteGroup[] = [
     {
       title: 'Core Pages',
-      routes: [
-        { path: '/', label: 'Home' },
-        { path: '/blog', label: 'Blog' },
-        { path: '/about', label: 'About' },
-        { path: '/careers', label: 'Careers' },
-        { path: '/privacy', label: 'Privacy Policy' },
-        { path: '/terms', label: 'Terms of Service' },
-      ],
+      routes: PUBLIC_ROUTES.map((r) => ({ path: r.path, label: r.title })),
     },
     {
       title: 'Admin Pages',
@@ -53,13 +47,15 @@ export default async function SitemapPage() {
         role="note"
         className="mb-6 px-4 py-3 rounded-lg border text-xs bg-bg-card border-border text-text-secondary"
       >
-        <strong className="text-text-primary">Manually maintained.</strong>{' '}
-        The route catalog below is hand-edited. When you add a new page, edit
+        <strong className="text-text-primary">One registry.</strong>{' '}
+        Core pages come from
         <code className="mx-1 px-1 py-0.5 rounded bg-bg-elevated font-mono">
-          src/app/(admin)/admin/sitemap/page.tsx
+          src/lib/seo/routes.ts
         </code>
-        to add it here. Search-engine sitemap is generated separately at{' '}
-        <code className="font-mono">/sitemap.xml</code>.
+        , the same list{' '}
+        <code className="font-mono">/sitemap.xml</code> and{' '}
+        <code className="font-mono">/llms.txt</code> read, with every live post
+        added from the database. Admin pages are listed here by hand.
       </aside>
       <SitemapView groups={groups} totalRoutes={totalRoutes} />
     </>

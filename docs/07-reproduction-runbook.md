@@ -32,16 +32,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY     # server-only; never expose to the browser/build
 # Optional:
 ANTHROPIC_API_KEY=YOUR_KEY                          # only if using /api/ai/*
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
+NEXT_PUBLIC_SITE_URL=https://your-domain.com          # required in production (docs/14)
+NEXT_PUBLIC_SITE_NAME=Acme
+# NEXT_PUBLIC_NOINDEX=1                             # staging and preview deployments only
 ```
 
 ## 3. Run the schema migration
 
 Open Supabase -> SQL Editor, paste the entire contents of `source/supabase/migrations/000_admin_cms_schema.sql`, and run it. This creates `user_roles`, the `SECURITY DEFINER` role helpers, all content tables with hardened RLS, the audit log, the MFA recovery-code store, and the `blog-images` Storage bucket with its write policies.
 
-Then run `source/supabase/migrations/001_staging_and_approval.sql` the same way. It adds the private `blog_post_staged_changes` table, its RLS, the review trigger and `publish_staged_posts()` ([docs/10](10-staging-and-approval.md)). Then run `002_hardening.sql`: the append-only audit trigger, the rate-limit table, the deferrable slug, the opt-in two-person lock and the private bucket for staged images ([docs/11](11-hardening-and-everyday-comforts.md)). Then `003_revisions_and_scheduling.sql`: revisions, scheduled publish and take-down, the promotion ledger and the lock on images and redirects ([docs/12](12-revisions-and-scheduling.md)). Then `004_media_library.sql`: alt text per image and the rule that a used image is never deleted ([docs/13](13-media-library.md)). All five files are safe to run again; if you ever re-run one, run every later file after it.
+Then run `source/supabase/migrations/001_staging_and_approval.sql` the same way. It adds the private `blog_post_staged_changes` table, its RLS, the review trigger and `publish_staged_posts()` ([docs/10](10-staging-and-approval.md)). Then run `002_hardening.sql`: the append-only audit trigger, the rate-limit table, the deferrable slug, the opt-in two-person lock and the private bucket for staged images ([docs/11](11-hardening-and-everyday-comforts.md)). Then `003_revisions_and_scheduling.sql`: revisions, scheduled publish and take-down, the promotion ledger and the lock on images and redirects ([docs/12](12-revisions-and-scheduling.md)). Then `004_media_library.sql`: alt text per image and the rule that a used image is never deleted ([docs/13](13-media-library.md)). Then `005_post_address_redirects.sql`: a renamed live post keeps its old address through a permanent redirect ([docs/14](14-seo-and-redirects.md)). All six files are safe to run again; if you ever re-run one, run every later file after it.
 
-To check all five migrations before you touch a real project, run the database tests on an in-memory Postgres (Node 22.18 or later, no Supabase project or Docker needed):
+To check all six migrations before you touch a real project, run the database tests on an in-memory Postgres (Node 22.18 or later, no Supabase project or Docker needed):
 
 ```bash
 cd source/supabase/tests

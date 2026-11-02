@@ -10,7 +10,10 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | public | The public key: the legacy `anon` key or a newer publishable key (`sb_publishable_...`). Public by design (in the client bundle); RLS protects the data. |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | **server-only** | The server key: the legacy `service_role` key or a newer secret key (`sb_secret_...`). Bypasses RLS. Used by `createServiceClient`, the `/api/admin/*` routes, `requireAdmin`'s role lookup, the AI rate limit and the redirect counter. NEVER expose to the browser or the CI build. |
 | `ANTHROPIC_API_KEY` | optional | server-only | Only if you use the `/api/ai/*` content-generation routes. |
-| `NEXT_PUBLIC_SITE_URL` | optional | public | Absolute site URL, for building links and the search and share previews in the editor. |
+| `NEXT_PUBLIC_SITE_URL` | **yes in production** | public | The public origin (`https://www.example.com`). Every canonical, share image, schema id, sitemap entry and the editor's previews are built from it. A production build refuses a missing value or a `localhost` address; development falls back to `http://localhost:3000` ([docs/14](14-seo-and-redirects.md)). |
+| `NEXT_PUBLIC_SITE_NAME` | optional | public | The brand name in titles and schema (default `Acme`). |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | optional | public | One sentence about the site, for `llms.txt` and the WebSite schema. |
+| `NEXT_PUBLIC_NOINDEX` | optional | public | `1` or `true` keeps the whole deployment out of search: robots disallows everything, post pages say `noindex`, the sitemap is empty and `/llms.txt` answers 404. Set it on staging and preview deployments only. |
 | `CSP_MODE` | optional | server-only | `enforce` blocks what the Content Security Policy forbids; anything else (the default) only reports. |
 | `CSP_SCOPE` | optional | server-only | `site` puts the policy on every page; the default is `/admin` only ([docs/11](11-hardening-and-everyday-comforts.md#security-headers-and-the-content-security-policy)). |
 | `CSP_REPORT_URI` | optional | server-only | Where browsers send policy violation reports. |
@@ -25,7 +28,7 @@ Env vars, the Supabase setup checklist, dependency classification, and host note
 
 ## Supabase setup (once per project)
 
-1. Run `source/supabase/migrations/000_admin_cms_schema.sql` in the SQL editor, then `001_staging_and_approval.sql` (staging and approval, [docs/10](10-staging-and-approval.md)), then `002_hardening.sql` ([docs/11](11-hardening-and-everyday-comforts.md)), then `003_revisions_and_scheduling.sql` ([docs/12](12-revisions-and-scheduling.md)).
+1. Run `source/supabase/migrations/000_admin_cms_schema.sql` in the SQL editor, then `001_staging_and_approval.sql` (staging and approval, [docs/10](10-staging-and-approval.md)), then `002_hardening.sql` ([docs/11](11-hardening-and-everyday-comforts.md)), then `003_revisions_and_scheduling.sql` ([docs/12](12-revisions-and-scheduling.md)), then `004_media_library.sql` ([docs/13](13-media-library.md)), then `005_post_address_redirects.sql` ([docs/14](14-seo-and-redirects.md)).
 2. Check the `blog-images` Storage bucket the migration created: public, 5 MB limit, MIME allow-list `image/jpeg, image/png, image/webp, image/gif`, and the four `blog_images_admin_*` policies on `storage.objects`; and the private `blog-images-staged` bucket 002 created, where images wait until their post goes live.
 3. Auth -> URL Configuration -> Redirect URLs: add `/admin/reset-password` and `/admin/reset-password?context=invite` for prod + localhost.
 4. Auth -> Providers -> Email: configure production SMTP; the default sender is rate-limited.
@@ -72,9 +75,9 @@ npm run build      # if this fails on a missing module, it's misclassified
 The kit is host-agnostic - any Node host that runs `next build` + `next start` works (Railway, Render, Fly, a container, etc.). The deploy is also your build gate: a broken build fails the deploy and the host keeps serving the last good version.
 
 Generic flow:
-1. Set the env vars in the host dashboard (all five, with the service-role key marked secret/server-only).
+1. Set the env vars in the host dashboard (the three Supabase values, `NEXT_PUBLIC_SITE_URL`, and any optional ones you use, with the service-role key marked secret/server-only). Give staging and preview environments `NEXT_PUBLIC_NOINDEX=1`.
 2. Connect the repo; the host builds on push.
-3. After deploy, verify the live URL: sign in, confirm a protected route redirects when signed out, confirm a published row renders and a draft does not.
+3. After deploy, verify the live URL: sign in, confirm a protected route redirects when signed out, confirm a published row renders and a draft does not, and open `/robots.txt` and `/sitemap.xml` ([docs/14](14-seo-and-redirects.md#before-launch)).
 
 ### A note on the proxy on non-Next-16 hosts
 

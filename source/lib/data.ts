@@ -44,6 +44,7 @@ export function mapPost(row: BlogPost) {
     slug: row.slug,
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
+    unpublishAt: row.unpublish_at ?? null,
     excerpt: row.excerpt,
     featuredImage: row.featured_image_url,
     featuredImageAlt: row.featured_image_alt,
@@ -110,27 +111,40 @@ export async function getBlogSlugs(): Promise<string[]> {
 }
 
 /**
- * Minimal blog data for the sitemap: `slug` + `featured_image_url` only.
+ * Minimal blog data for `app/sitemap.ts`: the slug, the featured image and the
+ * fields that decide whether the post is live and when it last changed.
  * Deliberately narrow (NOT `select('*')`) so crawler hits - which can fire
  * every revalidate window - never pull full post bodies just to emit URLs +
  * image entries. Throws on error so the sitemap's own try/catch can fall back
- * to a slug-only path (the wrapper that swallows errors must not be used here).
+ * to the static pages (the wrapper that swallows errors must not be used here).
+ * The sitemap builder applies the live-post rule again on top of RLS.
  */
 export async function getBlogSitemapEntries(): Promise<
-  Array<{ slug: string; featuredImage: string | null }>
+  Array<{
+    slug: string
+    featuredImage: string | null
+    status: BlogPost['status']
+    publishedAt: string | null
+    updatedAt: string | null
+    unpublishAt: string | null
+  }>
 > {
   const supabase = createAnonServerClient()
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('blog_posts')
-    .select('slug,featured_image_url')
+    .select('slug,featured_image_url,status,published_at,updated_at,unpublish_at')
     .or(`status.eq.published,and(status.eq.scheduled,published_at.lte.${now})`)
 
   if (error) throw error
   return (data || []).map(
-    (row: { slug: string; featured_image_url: string | null }) => ({
+    (row: Pick<BlogPost, 'slug' | 'featured_image_url' | 'status' | 'published_at' | 'updated_at' | 'unpublish_at'>) => ({
       slug: row.slug,
       featuredImage: row.featured_image_url,
+      status: row.status,
+      publishedAt: row.published_at,
+      updatedAt: row.updated_at,
+      unpublishAt: row.unpublish_at ?? null,
     }),
   )
 }

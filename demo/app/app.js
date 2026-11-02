@@ -15,7 +15,7 @@
   var STORE_KEY = 'cmskit-demo-v2';
   var THEME_KEY = 'cmskit-demo-theme';
   var SESSION_KEY = 'cmskit-demo-session';
-  var DEMO_VERSION = 'v1.5.0 demo';
+  var DEMO_VERSION = 'v1.6.0 demo';
   var DEMO_TOTP = '123456';
   var CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
   var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -1724,7 +1724,7 @@
     setTitle('Redirects');
     shell('redirects',
       head('Redirects', 'Send old addresses to their new home in one hop.', '<button type="button" class="btn btn-primary" data-act="new-redirect">' + icon('plus') + 'New redirect</button>') +
-      proposedNote('The address tester and the checks for loops, two-hop chains, duplicates and reserved paths are proposed. In the kit today a redirect is checked for a path source (no query or fragment), a path or http(s) destination, and no pattern source pointing off-site.', 'Partly proposed.') +
+      proposedNote('The address tester and the checks for duplicates and reserved paths are proposed. In the kit today (1.6.0) a redirect is checked for a path source (no query or fragment), a path or http(s) destination, no pattern source pointing off-site, and no loop with the other redirects; the Redirects page lists every chain with its one-hop fix, and a renamed live post gets its redirect from the database.', 'Partly proposed.') +
       '<section class="card" aria-labelledby="rt-h"><h2 id="rt-h">Test an address</h2><form id="rtest" class="row" novalidate><label class="sr-only" for="rtest-in">Path to test</label><input class="input grow" id="rtest-in" placeholder="/careers" spellcheck="false"><button class="btn btn-outline" type="submit">' + icon('play') + 'Test</button></form><p id="rtest-out" class="hint" role="status"></p></section>' +
       '<div class="table-wrap mt-16"><table class="tbl"><caption class="sr-only">Redirect rules</caption><thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col" class="col-opt">Type</th><th scope="col" class="col-opt">Visits</th><th scope="col">On</th><th scope="col" class="actions"><span class="sr-only">Actions</span></th></tr></thead><tbody id="rrows"></tbody></table></div>'
     );
@@ -1775,8 +1775,10 @@
       onSubmit: function (f, close) {
         var from = $('#r-from', f).value.trim(), to = $('#r-to', f).value.trim(), err = $('#r-err', f);
         // The kit's lib/redirects/validate.ts checks the path and destination
-        // shapes; the reserved-path, loop, duplicate and chain checks are the
-        // proposed additions shown on this page.
+        // shapes, and since 1.6.0 lib/redirects/chains.ts follows every hop to
+        // refuse a loop and list chains. This demo catches only a redirect to
+        // its own address and a two-hop chain; the reserved-path and duplicate
+        // checks are the proposed additions shown on this page.
         if (!/^\/[^\s?#]*$/.test(from)) { err.textContent = 'From must be a path starting with / (no spaces, no ? or #).'; return; }
         if (/^\/(admin|api|_next)(\/|$)/.test(from)) { err.textContent = 'Paths under /admin, /api and /_next cannot be redirected.'; return; }
         if (!(/^\/[^\s]*$/.test(to) || /^https?:\/\/[^\s]+$/i.test(to))) { err.textContent = 'To must be a path starting with / or a full http(s):// address.'; return; }

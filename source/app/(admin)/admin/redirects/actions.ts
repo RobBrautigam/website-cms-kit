@@ -5,12 +5,35 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/require";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { redirectInputSchema } from "@/lib/redirects/validate";
+import { loopRefusal, type RedirectRule } from "@/lib/redirects/chains";
 import {
   ok,
   err,
   type ActionResult,
   wrapSupabaseError,
 } from "@/lib/admin/action-result";
+
+type ServerClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
+
+/**
+ * Refuse a redirect that would make a loop with the switched-on static
+ * redirects (lib/redirects/chains.ts). If they cannot be read, the save is
+ * refused too: a loop makes pages unreachable, so the check fails closed.
+ */
+async function loopCheck(
+  supabase: ServerClient,
+  candidate: RedirectRule
+): Promise<ReturnType<typeof err> | null> {
+  if (!candidate.enabled || candidate.is_pattern) return null;
+  const { data, error } = await supabase
+    .from("url_redirects")
+    .select("id, source, destination, enabled, is_pattern")
+    .eq("enabled", true)
+    .eq("is_pattern", false);
+  if (error) return err("Could not check the other redirects for a loop. Try again.", "server");
+  const reason = loopRefusal(candidate, (data ?? []) as RedirectRule[]);
+  return reason ? err(reason, "validation") : null;
+}
 
 function parseFormToInput(formData: FormData) {
   return {
@@ -39,6 +62,8 @@ export async function createRedirect(
       "validation"
     );
   }
+  const loop = await loopCheck(supabase, parsed.data);
+  if (loop) return loop;
   const { data: inserted, error } = await supabase
     .from("url_redirects")
     .insert(parsed.data)
@@ -79,6 +104,8 @@ export async function updateRedirect(
       "validation"
     );
   }
+  const loop = await loopCheck(supabase, { id, ...parsed.data });
+  if (loop) return loop;
   const { data, error } = await supabase
     .from("url_redirects")
     .update(parsed.data)
@@ -130,6 +157,18 @@ export async function toggleRedirectEnabled(
 ): Promise<ActionResult> {
   await requireAdmin();
   const supabase = await createServerSupabaseClient();
+  if (next) {
+    const { data: row, error: readError } = await supabase
+      .from("url_redirects")
+      .select("id, source, destination, is_pattern")
+      .eq("id", id)
+      .maybeSingle();
+    const readWrapped = wrapSupabaseError(readError);
+    if (readWrapped) return readWrapped;
+    if (!row) return err("Redirect not found.", "not_found");
+    const loop = await loopCheck(supabase, { ...(row as Omit<RedirectRule, "enabled">), enabled: true });
+    if (loop) return loop;
+  }
   const { data, error } = await supabase
     .from("url_redirects")
     .update({ enabled: next })
