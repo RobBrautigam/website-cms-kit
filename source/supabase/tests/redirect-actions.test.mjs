@@ -65,6 +65,30 @@ test('switching on a redirect that would close a loop is refused; switching one 
   assert.equal(r.ok, true)
 })
 
+test('every switched-on redirect is checked, past the Data API\'s 1,000-row cap', async () => {
+  const { createRedirect } = await actions()
+  fakes.honorRange = true
+  fakes.tables.url_redirects = Array.from({ length: 1500 }, (_, i) => rule(`r${i}`, `/old-${i}`, `/new-${i}`))
+  fakes.tables.url_redirects[1200] = rule('r1200', '/b', '/a')
+  const r = await createRedirect({ ok: true }, form({ source: '/a', destination: '/b', permanent: 'true', enabled: 'on' }))
+  assert.equal(r.ok, false)
+  assert.match(r.error, /loop: \/a -> \/b -> \/a/)
+})
+
+test('a redirect to this site\'s own absolute address cannot hide a loop', async () => {
+  const { createRedirect } = await actions()
+  const before = process.env.NEXT_PUBLIC_SITE_URL
+  process.env.NEXT_PUBLIC_SITE_URL = 'https://www.example.com'
+  try {
+    const r = await createRedirect({ ok: true }, form({ source: '/a', destination: 'https://www.example.com/b', permanent: 'true', enabled: 'on' }))
+    assert.equal(r.ok, false)
+    assert.match(r.error, /loop/)
+  } finally {
+    if (before === undefined) delete process.env.NEXT_PUBLIC_SITE_URL
+    else process.env.NEXT_PUBLIC_SITE_URL = before
+  }
+})
+
 test('if the other redirects cannot be read, the save is refused (the check fails closed)', async () => {
   const { createRedirect } = await actions()
   fakes.failSelect.url_redirects = 'connection reset'

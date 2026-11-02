@@ -4,17 +4,24 @@
 -- Run after 004. Model: docs/14-seo-and-redirects.md.
 --
 -- When a live post's slug changes (a staged change published, a direct save,
--- the Data API, a scheduled publish), its old address would answer 404 and
--- every link and search result pointing at it would break. From this
--- migration, at the end of the transaction that changed it:
+-- the Data API), its old address would answer 404 and every link and search
+-- result pointing at it would break. From this migration, at the end of the
+-- transaction that changed it:
 --
 --   1. the old address gets a permanent redirect to the new one (category
 --      'post-slug-change'), or an existing redirect from it is repointed;
---   2. every other static redirect that pointed at the old address is
---      repointed at the new one, so no visitor follows a chain of two hops;
+--   2. every other static redirect that pointed at the old address (with or
+--      without a trailing slash) is repointed at the new one, so no visitor
+--      follows a chain of two hops;
 --   3. a redirect FROM the new address is switched off, because it would send
 --      visitors away from a live post (renaming a post back to an old slug);
 --   4. one audit row says what was done.
+--
+-- A second trigger (blog_posts_live_address_wins, at the end) covers the other
+-- way an address comes back: a post created, published or re-dated so that it
+-- is live at an address an older post left switches off the redirect from
+-- that address, with an audit row. The proxy redirects before a page renders,
+-- so without it the new post could never be reached.
 --
 -- It runs only for a post that was live at its old address and is live at its
 -- new one (the same rule as the public read policy in 003): a draft has no
@@ -31,8 +38,8 @@
 -- With review required (001), the rename itself only reaches a live post with
 -- a second admin's approval, so the redirect it causes is saved switched on;
 -- it runs as the table owner, which 003's redirect lock does not hold back.
--- changed_by records the admin whose session made the change (null for the
--- scheduler).
+-- changed_by records the admin whose session made the change (null when no
+-- admin session made it).
 
 create or replace function public.blog_post_path(post_slug text)
   returns text
@@ -79,9 +86,10 @@ declare
   repointed integer := 0;
   switched_off integer := 0;
 begin
-  -- The row as the transaction leaves it: renamed twice in one transaction,
-  -- both old addresses point at the final one; renamed back, nothing moved;
-  -- deleted, nothing to point at.
+  -- The row as the transaction leaves it. Each rename is its own event: a post
+  -- renamed twice in one transaction (a -> b -> c) has both earlier addresses
+  -- pointing at c; renamed a -> b -> a, the event for a finds nothing moved and
+  -- the one for b points b at a. Deleted, nothing to point at.
   select * into cur from public.blog_posts where id = new.id;
   if not found or cur.slug = old.slug then
     return null;
@@ -114,7 +122,7 @@ begin
     -- 2. No chains: point what pointed at the old address at the new one.
     update public.url_redirects
        set destination = new_path
-     where destination = old_path
+     where destination in (old_path, old_path || '/')
        and not is_pattern
        and source <> new_path
        and source <> old_path;
@@ -158,3 +166,51 @@ create constraint trigger blog_posts_keep_old_address
   for each row
   when (old.slug is distinct from new.slug)
   execute function public.blog_posts_keep_old_address();
+
+create or replace function public.blog_posts_live_address_wins()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  cur public.blog_posts%rowtype;
+  live_path text;
+  switched_off integer := 0;
+begin
+  -- A post live at an address owns it: no redirect may send its visitors
+  -- away (an older post renamed away from this slug left one behind).
+  select * into cur from public.blog_posts where id = new.id;
+  if not found or not public.blog_post_is_live(cur.status, cur.published_at, cur.unpublish_at) then
+    return null;
+  end if;
+
+  live_path := public.blog_post_path(cur.slug);
+  update public.url_redirects
+     set enabled = false,
+         notes = concat_ws(E'\n', notes,
+           'Switched off automatically: ' || live_path || ' is a live post.')
+   where source = live_path and enabled and not is_pattern;
+  get diagnostics switched_off = row_count;
+
+  if switched_off > 0 then
+    insert into public.admin_audit_log (actor_user_id, actor_email, action, resource_type, resource_id, payload)
+    values (
+      auth.uid(), 'database', 'redirect.live_address_reclaimed', 'blog_post', cur.id::text,
+      jsonb_build_object('address', live_path, 'switched_off', switched_off));
+  end if;
+  return null;
+end;
+$$;
+
+revoke all on function public.blog_posts_live_address_wins() from public, anon, authenticated;
+
+-- A scheduled post that goes live by its date alone changes no row; the
+-- scheduler (003) marks it published, which fires this. Without the scheduler,
+-- the redirect stays until the post is next saved.
+drop trigger if exists blog_posts_live_address_wins on public.blog_posts;
+create constraint trigger blog_posts_live_address_wins
+  after insert or update of slug, status, published_at, unpublish_at on public.blog_posts
+  deferrable initially deferred
+  for each row
+  execute function public.blog_posts_live_address_wins();

@@ -94,7 +94,7 @@ source/
   supabase/migrations/002_hardening.sql   append-only audit, rate limits, two-person lock, staged images
   supabase/migrations/003_revisions_and_scheduling.sql   revisions, scheduled publish and take-down, promotion ledger
   supabase/migrations/004_media_library.sql   alt text per image, a used image is never deleted
-  supabase/migrations/005_post_address_redirects.sql   a renamed live post keeps its old address (301)
+  supabase/migrations/005_post_address_redirects.sql   a renamed live post keeps its old address (permanent redirect)
   supabase/tests/               database tests on an in-memory Postgres (npm test)
 ```
 

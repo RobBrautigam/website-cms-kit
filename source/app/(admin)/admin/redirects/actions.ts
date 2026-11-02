@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/require";
 import { recordAdminAction } from "@/lib/auth/audit";
 import { redirectInputSchema } from "@/lib/redirects/validate";
 import { loopRefusal, type RedirectRule } from "@/lib/redirects/chains";
+import { readActiveStaticRules, siteOrigin } from "@/lib/redirects/active-rules";
 import {
   ok,
   err,
@@ -17,21 +18,18 @@ type ServerClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
 /**
  * Refuse a redirect that would make a loop with the switched-on static
- * redirects (lib/redirects/chains.ts). If they cannot be read, the save is
- * refused too: a loop makes pages unreachable, so the check fails closed.
+ * redirects (lib/redirects/chains.ts), all of them, read a page at a time. If
+ * they cannot be read, the save is refused too: a loop makes pages
+ * unreachable, so the check fails closed.
  */
 async function loopCheck(
   supabase: ServerClient,
   candidate: RedirectRule
 ): Promise<ReturnType<typeof err> | null> {
   if (!candidate.enabled || candidate.is_pattern) return null;
-  const { data, error } = await supabase
-    .from("url_redirects")
-    .select("id, source, destination, enabled, is_pattern")
-    .eq("enabled", true)
-    .eq("is_pattern", false);
-  if (error) return err("Could not check the other redirects for a loop. Try again.", "server");
-  const reason = loopRefusal(candidate, (data ?? []) as RedirectRule[]);
+  const rules = await readActiveStaticRules(supabase);
+  if (!rules) return err("Could not check the other redirects for a loop. Try again.", "server");
+  const reason = loopRefusal(candidate, rules, siteOrigin());
   return reason ? err(reason, "validation") : null;
 }
 

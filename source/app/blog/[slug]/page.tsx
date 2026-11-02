@@ -2,6 +2,7 @@
 // SEO spine (docs/14) and the staging preview (docs/10). Style it as your
 // site's own; the parts to keep are the metadata, the schema and the preview
 // branch.
+import { cache } from 'react'
 import type { Metadata } from 'next'
 import { draftMode } from 'next/headers'
 import { notFound } from 'next/navigation'
@@ -17,11 +18,13 @@ export const revalidate = 3600
 
 type Props = { params: Promise<{ slug: string }> }
 
-async function loadPost(slug: string) {
+// cache(): generateMetadata and the page share one load per request, so a
+// preview's admin checks and image signing run once.
+const loadPost = cache(async (slug: string) => {
   const { isEnabled } = await draftMode()
   const preview = isEnabled ? await getPreviewPost(slug) : null
   return { post: preview || (await getBlogPost(slug)), preview: !!preview }
-}
+})
 
 export async function generateStaticParams() {
   return (await getBlogSlugs()).map((slug) => ({ slug }))

@@ -86,14 +86,16 @@
 
 When a live post's address changes (a slug edit published through Staging, or any other write to the posts table, the Data API included), migration 005's trigger:
 
-1. **Adds a permanent (301) redirect from the old address to the new one**, category `post-slug-change`, with the signed-in admin whose change made the rename as its last editor.
-2. **Points older redirects at the new address.** A redirect that pointed at the old address now points straight at the new one, so a visitor makes one hop, never two. A pattern redirect (`/blog/:slug/amp`) is left alone, since its destination depends on the request.
+1. **Adds a permanent redirect from the old address to the new one** (the proxy answers it with a 308, the permanent redirect that keeps the request method; search engines treat it as a 301), category `post-slug-change`, with the signed-in admin whose change made the rename as its last editor.
+2. **Points older redirects at the new address.** A redirect that pointed at the old address (with or without a trailing slash) now points straight at the new one, so a visitor makes one hop, never two. One with a query string or a full `https://` address to the old page is left for you to repoint; the Redirects screen lists it as a chain (a full address, when it is on the `NEXT_PUBLIC_SITE_URL` origin). A pattern redirect (`/blog/:slug/amp`) is left alone, since its destination depends on the request.
 3. **Switches off any redirect away from the new address**, so a post renamed back to an earlier address is reachable again, with a note on the switched-off row.
 4. **Writes an audit row** (`redirect.post_address_changed`) with both addresses and what it changed.
 
 It does nothing for a post that is not live before and after the change (a draft, a scheduled post before its date, a post past its end date), so a draft's working titles never become redirects. It also makes no redirect from an address another live post now uses: when two posts swap addresses in one publish, both stay reachable at their new addresses and the audit rows say no redirect was made.
 
-**Why it waits until the end of the change.** The trigger is a deferred constraint trigger: it runs once the whole publish has finished, and reads the posts as they are then. That is what makes a swap safe (an immediate trigger would see the first half of the swap and send one post's old address to a page that has since moved), and what makes a post renamed twice in one change end with one redirect to its final address.
+**Why it waits until the end of the change.** The trigger is a deferred constraint trigger: it runs once the whole publish has finished, and reads the posts as they are then. That is what makes a swap safe (an immediate trigger would see the first half of the swap and send one post's old address to a page that has since moved), and what makes a post renamed twice in one change send every address it passed through to its final one.
+
+**A new post at a freed address wins it back.** When an older post leaves an address, its redirect stays there. A post that later goes live at that address (created, published, or re-dated so it is live) switches the redirect off at the end of the change, with an audit row (`redirect.live_address_reclaimed`), because the proxy redirects before a page renders and the new post could never be reached. A scheduled post that goes live by its date alone changes no row; the scheduler ([docs/12](12-revisions-and-scheduling.md#running-the-scheduler)) marks it published, which does it, and without a scheduler the redirect stays until the post is next saved.
 
 **Under the two-person lock.** The redirect is written by the database itself, so it is saved switched on even when review is required for redirects ([docs/12](12-revisions-and-scheduling.md)). The rename it follows already needed a second admin's approval, so nothing reaches the live site without one.
 
@@ -101,9 +103,10 @@ It does nothing for a post that is not live before and after the change (a draft
 
 A chain (`/a` to `/b` to `/c`) costs every visitor and crawler an extra round trip and loses link value at each hop. A loop (`/a` to `/b` to `/a`) makes a page unreachable.
 
-- **The Redirects screen lists every chain** with the address to point it at directly, and every loop, under its heading. Only switched-on static redirects are followed; a pattern's destination depends on the request.
+- **The Redirects screen lists every chain** with the address to point it at directly, and every loop, under its heading. Only switched-on static redirects are followed; a pattern's destination depends on the request. A full address on the site's own origin (`https://www.example.com/b`, with `NEXT_PUBLIC_SITE_URL` set to that origin) is followed like the path `/b`. A chain longer than 20 hops is listed as a chain to point at its final page, never as a loop.
 - **A save or a switch-on that would make a loop is refused**, with the loop spelled out: "This would make a loop: /a -> /b -> /a. Point the redirect at the final page instead." A redirect saved switched off is not refused; it is checked when it is switched on. An edit is checked against the other redirects, never against its own old row.
-- **The check fails closed.** If the other redirects cannot be read, the save is refused and asks you to try again.
+- **Every redirect is checked.** The switched-on redirects are read a page of 1,000 at a time, so the Data API's row cap never hides one.
+- **The check fails closed.** If the other redirects cannot be read, the save is refused and asks you to try again, and the Redirects screen says it could not check rather than showing nothing.
 
 ## Before launch
 
@@ -121,8 +124,8 @@ A checklist for the day the site goes live, in the order to do it:
 ## Tests
 
 - `source/lib/seo/seo.test.mjs`: the site address rules (production refuses a missing or local address), canonical and absolute addresses, the public visibility rule, titles and descriptions, the metadata and both share cards, the schema and its escaping, the sitemap, robots under both switch settings, and `llms.txt`. 12 tests.
-- `source/supabase/tests/address-redirects.test.mjs`: migration 005 on PGlite. A rename through `publish_staged_posts()` with its audit row; chains collapsed with a pattern left alone; renamed back; renamed twice in one change; drafts, ended and taken-down posts; a draft renamed and published in one change; a swap; the two-person lock; privileges; and the file re-run. 10 tests.
-- `source/lib/redirects/chains.test.mjs` and `source/supabase/tests/redirect-actions.test.mjs`: chains, loops, the refusal, and the create, edit and switch-on actions refusing a loop and failing closed. 10 tests.
+- `source/supabase/tests/address-redirects.test.mjs`: migration 005 on PGlite. A rename through `publish_staged_posts()` with its audit row; chains collapsed with a pattern left alone; renamed back; renamed twice in one change; a trailing-slash destination; a new post winning back a freed address, created as a draft, then published, and created live; drafts, ended and taken-down posts; a draft renamed and published in one change; a swap; the two-person lock; privileges; and the file re-run. 12 tests.
+- `source/lib/redirects/chains.test.mjs` and `source/supabase/tests/redirect-actions.test.mjs`: chains, loops, the refusal, the site's own full addresses, chains past the hop limit, and the create, edit and switch-on actions refusing a loop, reading past the 1,000-row cap and failing closed. 14 tests.
 
 Each test was seen failing first: every rule it guards was broken on purpose, one at a time, and the suite turned red each time.
 
@@ -132,3 +135,5 @@ Each test was seen failing first: every rule it guards was broken on purpose, on
 - **No check of the share image's size.** Use 1200 by 630; the kit does not measure it.
 - **No author pages.** The schema carries an author only once `resolveAuthor()` is wired.
 - **The redirect tester and the checks for duplicates and reserved paths** are still the demo's proposals.
+- **The loop check runs in the app, not the database.** Two admins saving the two halves of a loop at the same moment can both pass it; the Redirects screen then lists the loop. A database-side check would close that.
+- **A slug outside `a-z`, `0-9` and `-`** (possible through the Data API; the editor never makes one) gets a redirect whose source the proxy will not match, because requests arrive percent-encoded.

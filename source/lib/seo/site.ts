@@ -9,8 +9,9 @@
  *   NEXT_PUBLIC_SITE_DESCRIPTION  one sentence about the site (llms.txt, WebSite schema)
  *   NEXT_PUBLIC_NOINDEX           "1" or "true" keeps the whole site out of search
  *                                 (staging and preview deploys): robots.txt
- *                                 disallows everything, every page says noindex,
- *                                 and the sitemap is empty.
+ *                                 disallows everything, every page built with
+ *                                 postMetadata (and the root layout in docs/14)
+ *                                 says noindex, and the sitemap is empty.
  */
 
 export const BLOG_BASE_PATH = '/blog'

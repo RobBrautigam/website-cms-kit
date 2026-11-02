@@ -20,7 +20,7 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 | **Audit log** | **Dark theme** |
 | [![Audit log with filters and CSV export](demo/screenshots/audit-log-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/audit) | [![Staging page in the dark theme](demo/screenshots/staging-dark-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) |
 
-**New in 1.6.0:** the public side of the site. A sitemap, `robots.txt`, `llms.txt`, schema and post metadata, all built from one site address and from the posts the public can actually read; a switch that keeps staging out of search; a renamed live post that keeps its old address through a 301; and a redirect manager that refuses loops and lists chains. See [docs/14](docs/14-seo-and-redirects.md). Since 1.5.0 the demo has [the media library](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media).
+**New in 1.6.0:** the public side of the site. A sitemap, `robots.txt`, `llms.txt`, schema and post metadata, all built from one site address and from the posts the public can actually read; a switch that keeps staging out of search; a renamed live post that keeps its old address through a permanent redirect; and a redirect manager that refuses loops and lists chains. See [docs/14](docs/14-seo-and-redirects.md). Since 1.5.0 the demo has [the media library](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media).
 
 ### A five-minute walkthrough
 
@@ -42,7 +42,7 @@ git clone https://github.com/RobBrautigam/website-cms-kit.git
 cd website-cms-kit
 
 # 1. The tests: all six migrations on an in-memory Postgres, the route handlers,
-#    the SEO rules and the redirect checks (258 tests, under a minute).
+#    the SEO rules and the redirect checks (264 tests, under a minute).
 npm ci --prefix source/supabase/tests
 npm test --prefix source/supabase/tests
 
@@ -131,7 +131,7 @@ npm install
 npm test
 ```
 
-The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains and the redirect a renamed post gets are tested the same way. 258 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
+The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains and the redirect a renamed post gets are tested the same way. 264 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 

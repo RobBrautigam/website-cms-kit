@@ -29,6 +29,29 @@ test('problems: a chain with its one-hop fix, a loop listed once, single hops le
   assert.deepEqual([...loops[0]].sort(), ['/x', '/x', '/y'].sort())
 })
 
+test('an absolute address on the site\'s own origin is followed like a path; another origin is not', () => {
+  const origin = 'https://www.example.com'
+  assert.equal(destinationPath('https://www.example.com/b/?x=1', origin), '/b')
+  assert.equal(destinationPath('https://www.example.com', origin), '/')
+  assert.equal(destinationPath('https://other.example/b', origin), null)
+  assert.equal(destinationPath('https://www.example.com/b'), null)
+  const existing = [r('/b', '/a', { id: '2' })]
+  assert.match(loopRefusal(r('/a', 'https://www.example.com/b'), existing, origin), /loop: \/a -> \/b -> \/a/)
+  assert.equal(loopRefusal(r('/a', 'https://other.example/b'), existing, origin), null)
+})
+
+test('a chain longer than the hop limit is a long chain, never a loop', () => {
+  const rules = Array.from({ length: 25 }, (_, i) => r(`/p${i}`, `/p${i + 1}`))
+  const f = follow('/p0', rules)
+  assert.equal(f.loop, false)
+  assert.equal(f.tooLong, true)
+  assert.equal(loopRefusal(r('/start', '/p0'), rules), null)
+  const { chains, loops } = findRedirectProblems(rules)
+  assert.equal(loops.length, 0)
+  assert.equal(chains.find((c) => c.source === '/p0').tooLong, true)
+  assert.equal(chains.find((c) => c.source === '/p20').tooLong, undefined)
+})
+
 test('a save that would loop is refused; a chain is not a loop; an edit replaces its own row', () => {
   const existing = [r('/b', '/c', { id: '2' }), r('/c', '/a', { id: '3' })]
   assert.match(loopRefusal(r('/a', '/b'), existing), /loop: \/a -> \/b -> \/c -> \/a/)

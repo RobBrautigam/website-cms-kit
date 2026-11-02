@@ -125,6 +125,41 @@ test('renamed twice in one transaction: the first address points straight at the
   const list = await redirects()
   assert.equal(bySource(list, '/blog/live-post').destination, '/blog/third-name')
   assert.equal(bySource(list, '/spring-campaign').destination, '/blog/third-name')
+  // Each rename is its own event, so the address passed through points at the last one too.
+  assert.equal(bySource(list, '/blog/second-name').destination, '/blog/third-name')
+}))
+
+test('a redirect to the old address written with a trailing slash is repointed too', () => scenario(async () => {
+  await asOwner()
+  await rows(`insert into public.url_redirects (source, is_pattern, destination) values ('/promo', false, '/blog/live-post/')`)
+  await rows(`update public.blog_posts set slug = 'moved' where id = $1`, [LIVE])
+  await commitPoint()
+  assert.equal(bySource(await redirects(), '/promo').destination, '/blog/moved')
+}))
+
+test('a post that goes live at an address an older post left wins it back from the redirect', () => scenario(async () => {
+  await asOwner()
+  await rows(`update public.blog_posts set slug = 'live-post-2' where id = $1`, [LIVE])
+  await rows(`update public.blog_posts set slug = 'other-post-2' where id = $1`, [OTHER])
+  await commitPoint()
+  let list = await redirects()
+  assert.equal(bySource(list, '/blog/live-post').enabled, true)
+  assert.equal(bySource(list, '/blog/other-post').enabled, true)
+  // A new draft at the freed address is not live: the redirect stays.
+  const [p] = await rows(`insert into public.blog_posts (title, slug, status, body) values ('New', 'live-post', 'draft', '{}') returning id`)
+  await commitPoint()
+  assert.equal(bySource(await redirects(), '/blog/live-post').enabled, true)
+  // Published: the post wins its address back.
+  await rows(`update public.blog_posts set status = 'published', published_at = now() where id = $1`, [p.id])
+  // Created already live: the same.
+  await rows(`insert into public.blog_posts (title, slug, status, published_at, body) values ('New 2', 'other-post', 'published', now(), '{}')`)
+  await commitPoint()
+  list = await redirects()
+  assert.equal(bySource(list, '/blog/live-post').enabled, false)
+  assert.equal(bySource(list, '/blog/other-post').enabled, false)
+  assert.equal(bySource(list, '/blog/live-post-2'), undefined)
+  const audit = await rows(`select payload->>'address' as address from public.admin_audit_log where action = 'redirect.live_address_reclaimed' order by 1`)
+  assert.deepEqual(audit.map((a) => a.address), ['/blog/live-post', '/blog/other-post'])
 }))
 
 test('a draft, an ended post, or a post taken down in the same change gets no redirect', () => scenario(async () => {
@@ -182,13 +217,15 @@ test('the helpers match the public read policy, and clients cannot call the trig
     public.blog_post_is_live('draft', null, null) as draft`)
   assert.deepEqual(h, { p: '/blog/a-b', pub: true, later: false, due: true, ended: false, draft: false })
   const [g] = await rows(`select has_function_privilege('authenticated', 'public.blog_posts_keep_old_address()', 'execute') as auth,
-    has_function_privilege('anon', 'public.blog_posts_keep_old_address()', 'execute') as anon`)
-  assert.deepEqual(g, { auth: false, anon: false })
+    has_function_privilege('anon', 'public.blog_posts_keep_old_address()', 'execute') as anon,
+    has_function_privilege('authenticated', 'public.blog_posts_live_address_wins()', 'execute') as auth2,
+    has_function_privilege('anon', 'public.blog_posts_live_address_wins()', 'execute') as anon2`)
+  assert.deepEqual(g, { auth: false, anon: false, auth2: false, anon2: false })
 }))
 
 test('migration 005 can be run again on a database that already has it', () => scenario(async () => {
   await asOwner()
   await db.exec(readFileSync(MIGRATIONS[6], 'utf8'))
-  const [t] = await rows(`select count(*)::int as n from pg_trigger where tgname = 'blog_posts_keep_old_address'`)
-  assert.equal(t.n, 1)
+  const [t] = await rows(`select count(*)::int as n from pg_trigger where tgname in ('blog_posts_keep_old_address', 'blog_posts_live_address_wins')`)
+  assert.equal(t.n, 2)
 }))

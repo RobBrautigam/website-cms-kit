@@ -7,7 +7,8 @@ import {
   fetchDistinctCategories,
   type SortKey,
 } from "@/lib/redirects/queries";
-import { findRedirectProblems, type RedirectRule } from "@/lib/redirects/chains";
+import { findRedirectProblems } from "@/lib/redirects/chains";
+import { readActiveStaticRules, siteOrigin } from "@/lib/redirects/active-rules";
 import RowDeleteButton from "@/components/admin/RowDeleteButton";
 import ToggleButton from "@/components/admin/ToggleButton";
 import { deleteRedirect, toggleRedirectEnabled } from "./actions";
@@ -68,15 +69,13 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
   const [{ rows, totalCount }, categories, activeRules] = await Promise.all([
     fetchAllRedirects(supabase, { search, category: categoryFilter, sort, page, pageSize: PAGE_SIZE }),
     fetchDistinctCategories(supabase),
-    // Every switched-on static redirect, for the chain and loop check below.
-    supabase
-      .from("url_redirects")
-      .select("id, source, destination, enabled, is_pattern")
-      .eq("enabled", true)
-      .eq("is_pattern", false)
-      .then(({ data }) => (data ?? []) as RedirectRule[]),
+    // Every switched-on static redirect, for the chain and loop check below
+    // (null when they could not be read: the page says so, never "all clear").
+    readActiveStaticRules(supabase),
   ]);
-  const problems = findRedirectProblems(activeRules);
+  const problems = activeRules
+    ? findRedirectProblems(activeRules, siteOrigin())
+    : { chains: [], loops: [] };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
@@ -134,6 +133,16 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
+      {!activeRules && (
+        <aside
+          role="note"
+          aria-label="Redirect chains and loops"
+          className="mb-6 px-4 py-3 rounded-lg border text-sm bg-bg-card border-border text-text-secondary"
+        >
+          Could not check the redirects for chains and loops. Reload the page to try again.
+        </aside>
+      )}
+
       {(problems.chains.length > 0 || problems.loops.length > 0) && (
         <aside
           role="note"
@@ -161,7 +170,7 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
                 {problems.chains.map((c) => (
                   <li key={c.source}>
                     <span className="font-mono">{c.hops.join(" -> ")}</span>
-                    {" "}(fix: {c.source} to {c.fixTo})
+                    {c.tooLong ? " (longer than 20 hops: point it at its final page)" : <> (fix: {c.source} to {c.fixTo})</>}
                   </li>
                 ))}
               </ul>
