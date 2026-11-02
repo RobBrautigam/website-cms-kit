@@ -46,6 +46,7 @@ function table(name) {
   let op = 'select'
   let payload = null
   const filters = []
+  let bounds = null
   const matches = (r) =>
     filters.every(([kind, col, v]) =>
       kind === 'in' ? v.includes(r[col]) : kind === 'lte' ? r[col] != null && String(r[col]) <= String(v)
@@ -75,7 +76,8 @@ function table(name) {
       delete fakes.beforeUpdate[name]
       change(rows)
     }
-    const hit = rows.filter(matches)
+    const all = rows.filter(matches)
+    const hit = op === 'select' && bounds && fakes.honorRange ? all.slice(bounds[0], bounds[1] + 1) : all
     if (op === 'update') hit.forEach((r) => Object.assign(r, payload))
     if (op === 'delete') hit.forEach((r) => rows.splice(rows.indexOf(r), 1))
     return { data: one(hit), error: null }
@@ -87,7 +89,7 @@ function table(name) {
     select() { return q },
     order() { return q },
     limit() { return q },
-    range() { return q },
+    range(from, to) { bounds = [from, to]; return q },
     eq(col, v) { filters.push(['eq', col, v]); return q },
     in(col, v) { filters.push(['in', col, v]); return q },
     lte(col, v) { filters.push(['lte', col, v]); return q },

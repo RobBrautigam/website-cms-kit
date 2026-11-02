@@ -68,6 +68,8 @@ source/
         audit-log/              filterable log + CSV export
         settings/               2FA + change password
         sitemap/ help/          utility pages
+    blog/[slug]/page.tsx        example public post page: metadata, schema, staging preview (docs/14)
+    sitemap.ts robots.ts llms.txt/   /sitemap.xml, /robots.txt and /llms.txt from the live posts
     api/
       admin/auth/ admin/mfa/ admin/users/        admin-only JSON endpoints
       admin/preview/            turn the whole-site preview (Next.js draft mode) on and off
@@ -77,17 +79,22 @@ source/
     supabase/                   client factories + session-refresh helper + resource data layers
     auth/                       require gates, role types, MFA, audit writer, team queries, password rules
     admin/                      ActionResult discriminated union
-    redirects/                  redirect lookup + matching + validation (backs the proxy + resource)
+    redirects/                  redirect lookup + matching + validation + chains and loops (backs the proxy + resource)
+    seo/                        site address, metadata, JSON-LD, sitemap, robots, llms.txt, the public route list
     staging/                    staging rules, staged-change queries, preview reads (draft mode only)
     a11y/                       focus trap, scroll lock, media query, reduced motion
   components/
     admin/                      AdminShell, nav, primitives, MFA UI, resource UI
     TipTapRenderer.tsx          renders TipTap JSON to article HTML
+    JsonLd.tsx                  one escaped application/ld+json script (server component)
     redirects/RedirectBeacon.tsx  optional internal-redirect hit telemetry
   app/globals.css               neutral design tokens + component classes (re-theme here)
   supabase/migrations/000_admin_cms_schema.sql   the whole schema + RLS
   supabase/migrations/001_staging_and_approval.sql   staged post changes + RLS + review trigger
   supabase/migrations/002_hardening.sql   append-only audit, rate limits, two-person lock, staged images
+  supabase/migrations/003_revisions_and_scheduling.sql   revisions, scheduled publish and take-down, promotion ledger
+  supabase/migrations/004_media_library.sql   alt text per image, a used image is never deleted
+  supabase/migrations/005_post_address_redirects.sql   a renamed live post keeps its old address (permanent redirect)
   supabase/tests/               database tests on an in-memory Postgres (npm test)
 ```
 

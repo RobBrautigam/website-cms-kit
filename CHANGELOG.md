@@ -2,6 +2,33 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.6.0 (2026-11-02)
+
+The public side of the site: what search engines and AI answer engines read, and old addresses that keep working. Run `005_post_address_redirects.sql` after 004. Full detail in [docs/14](docs/14-seo-and-redirects.md).
+
+### Added
+
+- **One source for the site's address** (`lib/seo/site.ts`). Every canonical, share image, schema id, sitemap entry and robots line is built from `NEXT_PUBLIC_SITE_URL`; a production build refuses a missing or `localhost` value.
+- **Post metadata** (`lib/seo/metadata.ts`): a self-referencing absolute canonical, a title that keeps the brand suffix only when it fits in 60 characters, the description or excerpt clipped at 160, and Open Graph and Twitter cards with the featured image and its alt text.
+- **Schema** (`lib/seo/json-ld.ts`, `components/JsonLd.tsx`): Organization and WebSite for the root layout, BlogPosting and BreadcrumbList for posts, linked by `@id`, with nothing invented for a field the post lacks.
+- **`/sitemap.xml`, `/robots.txt` and `/llms.txt`**, built from one list of public pages (`lib/seo/routes.ts`, also read by the admin's Sitemap screen) and the live posts only, by the same rule as the public read policy.
+- **A noindex switch** (`NEXT_PUBLIC_NOINDEX`) that keeps a staging or preview deployment out of search.
+- **An example public post page** (`app/blog/[slug]/page.tsx`) wired to the metadata, the schema and the staging preview.
+- **A renamed live post keeps its old address** (migration 005). The database adds a permanent redirect from the old address, points older redirects straight at the new one so nothing chains, switches off a redirect away from the new address, and writes an audit row. It waits until the whole change is done, so a slug swap in one publish comes out right; drafts and posts that are not live get no redirect. A post that later goes live at an address an older post left wins it back: the redirect from it is switched off, with an audit row.
+- **Redirect chains and loops** (`lib/redirects/chains.ts`, `lib/redirects/active-rules.ts`). The Redirects screen lists every chain with its one-hop fix and every loop; a save or a switch-on that would make a loop is refused with the loop spelled out. Every switched-on redirect is read, a page at a time past the Data API's row cap; a full address on the site's own origin is followed like a path; the check fails closed, and the screen says when it could not check.
+- A launch checklist in `docs/14-seo-and-redirects.md`, and 38 more tests (264 in all), each seen failing first by breaking the rule it guards.
+
+### Security
+
+- **JSON-LD is escaped** (`<`, `>`, `&`, U+2028 and U+2029), so no post field can close the script tag.
+- **Migration 005's two triggers** run as `SECURITY DEFINER` with an empty `search_path`, and no API role can call their functions.
+
+### Changed
+
+- `APP_VERSION` reads `v1.6.0`. The data layer's sitemap read now carries each post's status and dates, and `mapPost` its end date. The test stand-in for Supabase honors `.range()` when a test asks it to.
+- `NEXT_PUBLIC_SITE_URL` is required in production; `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_SITE_DESCRIPTION` and `NEXT_PUBLIC_NOINDEX` are new (`.env.example`, docs/09).
+- README: a quick start from a clean clone. docs/01, 07 and 09, SECURITY.md and the demo's notes say what 1.6.0 changed.
+
 ## 1.5.0 (2026-10-09)
 
 The media library, and an optional server job for the images of scheduled posts. Run `004_media_library.sql` after 003. Full detail in [docs/13](docs/13-media-library.md).

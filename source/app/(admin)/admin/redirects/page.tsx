@@ -7,6 +7,8 @@ import {
   fetchDistinctCategories,
   type SortKey,
 } from "@/lib/redirects/queries";
+import { findRedirectProblems } from "@/lib/redirects/chains";
+import { readActiveStaticRules, siteOrigin } from "@/lib/redirects/active-rules";
 import RowDeleteButton from "@/components/admin/RowDeleteButton";
 import ToggleButton from "@/components/admin/ToggleButton";
 import { deleteRedirect, toggleRedirectEnabled } from "./actions";
@@ -64,10 +66,16 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
   const search = sp.q?.trim() || undefined;
   const categoryFilter = sp.cat === "__none__" ? null : sp.cat || undefined;
 
-  const [{ rows, totalCount }, categories] = await Promise.all([
+  const [{ rows, totalCount }, categories, activeRules] = await Promise.all([
     fetchAllRedirects(supabase, { search, category: categoryFilter, sort, page, pageSize: PAGE_SIZE }),
     fetchDistinctCategories(supabase),
+    // Every switched-on static redirect, for the chain and loop check below
+    // (null when they could not be read: the page says so, never "all clear").
+    readActiveStaticRules(supabase),
   ]);
+  const problems = activeRules
+    ? findRedirectProblems(activeRules, siteOrigin())
+    : { chains: [], loops: [] };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
@@ -124,6 +132,52 @@ export default async function AdminRedirectsPage({ searchParams }: PageProps) {
           + New Redirect
         </Link>
       </div>
+
+      {!activeRules && (
+        <aside
+          role="note"
+          aria-label="Redirect chains and loops"
+          className="mb-6 px-4 py-3 rounded-lg border text-sm bg-bg-card border-border text-text-secondary"
+        >
+          Could not check the redirects for chains and loops. Reload the page to try again.
+        </aside>
+      )}
+
+      {(problems.chains.length > 0 || problems.loops.length > 0) && (
+        <aside
+          role="note"
+          aria-label="Redirect chains and loops"
+          className="mb-6 px-4 py-3 rounded-lg border text-sm bg-bg-card border-border text-text-secondary"
+        >
+          {problems.loops.length > 0 && (
+            <>
+              <p className="font-semibold text-text-primary">
+                {problems.loops.length === 1 ? "1 loop" : `${problems.loops.length} loops`}: these pages cannot be reached.
+              </p>
+              <ul className="mt-1 mb-2 list-disc pl-5 font-mono text-xs">
+                {problems.loops.map((l) => (
+                  <li key={l.join(" ")}>{l.join(" -> ")}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {problems.chains.length > 0 && (
+            <>
+              <p className="font-semibold text-text-primary">
+                {problems.chains.length === 1 ? "1 chain" : `${problems.chains.length} chains`}: point each one straight at its last address.
+              </p>
+              <ul className="mt-1 list-disc pl-5 text-xs">
+                {problems.chains.map((c) => (
+                  <li key={c.source}>
+                    <span className="font-mono">{c.hops.join(" -> ")}</span>
+                    {c.tooLong ? " (longer than 20 hops: point it at its final page)" : <> (fix: {c.source} to {c.fixTo})</>}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </aside>
+      )}
 
       {/* Mobile filter disclosure */}
       <details className="md:hidden mb-4 group">

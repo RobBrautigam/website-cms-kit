@@ -15,7 +15,7 @@ Most of the demo mirrors code in the kit's source today. A few screens preview f
 | | |
 |---|---|
 | **In the kit's source today** | Invite-only sign-in, two-factor and recovery codes, posts with draft, scheduled and published states, a per-post preview, local autosave, the TipTap editor, image upload from the post form, staged edits on live posts with request review, approve and discard, the Staging page with compare, a whole-site preview and publish-selected, team management, the audit log with CSV export, redirects, the media library (1.5.0). (The kit also has jobs, testimonials, a sitemap view and a help page, which the demo leaves out.) |
-| **Proposed, previewed in the demo** | Resending or cancelling an invite, and the redirect tester with its loop, chain, duplicate and reserved-path checks. |
+| **Proposed, previewed in the demo** | Resending or cancelling an invite, and the redirect tester with its duplicate and reserved-path checks. (The loop and chain checks are real in the kit since 1.6.0; the demo's simpler version catches only a redirect to its own address and a two-hop chain.) |
 | **Demo-only helpers** | The light and dark theme switch (the kit documents how to add one), viewing the admin as another role, "Demo: approve as" a teammate (in the kit the teammate signs in and approves), reset demo data. |
 
 ## What works
@@ -30,7 +30,7 @@ Most of the demo mirrors code in the kit's source today. A few screens preview f
 | Media | The media library (1.5.0): each image's Private or Public state and the posts that use it, filters, upload (JPEG, PNG, WebP or GIF up to 5 MB, resized in the browser), alt text kept per image and offered when you pick it again as a featured or inline image, delete turned off for an image in use. |
 | Team | Invite, change role, turn access off and on, reset link, the last-super-admin guard; resend or cancel an invite (proposed). |
 | Audit log | Every action above, filter by type and person, search, 50 rows a page, CSV export (with spreadsheet formula injection neutralized). |
-| Redirects | Add, edit, toggle, delete, and the kit's path and destination checks; a path tester and checks for loops, duplicates, reserved paths and two-hop chains (proposed). |
+| Redirects | Add, edit, toggle, delete, and the kit's path and destination checks; a redirect to its own address and a two-hop chain caught (the kit's fuller loop and chain checks landed in 1.6.0); a path tester and checks for duplicates and reserved paths (proposed). |
 | Settings | Light, dark or system theme, new recovery codes, two-factor off and on, change password with live rules, view the admin as an `admin` instead of a `super_admin`, reset demo data. |
 
 It works at phone and desktop widths, in light and dark themes, with the keyboard alone, and with a screen reader (labeled controls, focus moved to each page's heading, focus-trapped dialogs, announced notifications).

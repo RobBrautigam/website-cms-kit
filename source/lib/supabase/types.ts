@@ -12,6 +12,8 @@ export interface BlogPost {
   categories: string[]
   status: 'draft' | 'published' | 'scheduled'
   meta_description: string | null
+  /** The end date (migration 003): the post comes down after it. */
+  unpublish_at?: string | null
   created_at: string
   updated_at: string
 }
