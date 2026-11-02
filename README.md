@@ -42,7 +42,7 @@ git clone https://github.com/RobBrautigam/website-cms-kit.git
 cd website-cms-kit
 
 # 1. The tests: all six migrations on an in-memory Postgres, the route handlers,
-#    the SEO rules and the redirect checks (258 tests, about a minute).
+#    the SEO rules and the redirect checks (258 tests, under a minute).
 npm ci --prefix source/supabase/tests
 npm test --prefix source/supabase/tests
 
