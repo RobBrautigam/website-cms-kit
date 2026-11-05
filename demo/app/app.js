@@ -15,7 +15,7 @@
   var STORE_KEY = 'cmskit-demo-v2';
   var THEME_KEY = 'cmskit-demo-theme';
   var SESSION_KEY = 'cmskit-demo-session';
-  var DEMO_VERSION = 'v1.6.0 demo';
+  var DEMO_VERSION = 'v1.7.0 demo';
   var DEMO_TOTP = '123456';
   var CODE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
   var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

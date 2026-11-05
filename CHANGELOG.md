@@ -2,6 +2,25 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.7.0 (2026-11-05)
+
+Content checks in the editor, and a `/llms.txt` that survives a database outage. No migration. Full detail in [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).
+
+### Added
+
+- **Content checks on the edit screen** (`lib/admin/content-checks.ts`), under the search and share previews: an H1 in the body (the title is the page's one H1), an H3 with no H2 above it, a heading with no text, link text that does not say where it goes ("click here", "read more", a bare address, no text), images without alt text, and a slug that is not lowercase letters and digits joined by single hyphens. They warn and never block a save.
+- **One heading level for the page and the check** (`renderedHeadingLevel()` in `lib/tiptap/schema.ts`): the public renderer draws headings through it, so the check judges the page a reader gets.
+- 12 more tests (276 in all), each seen failing first by breaking the rule it guards.
+
+### Fixed
+
+- **`/llms.txt` no longer caches an empty list for an hour after a database error.** It reads only the fields it prints (`getLlmsTxtEntries()`), and the error goes through, so Next.js keeps serving the last good file and retries on the next request.
+- Two test strings in `lib/seo/seo.test.mjs` held a raw line separator character; they are escape sequences now.
+
+### Changed
+
+- `APP_VERSION` reads `v1.7.0`. The post form passes the editor's body to the sidebar for the checks.
+
 ## 1.6.0 (2026-11-02)
 
 The public side of the site: what search engines and AI answer engines read, and old addresses that keep working. Run `005_post_address_redirects.sql` after 004. Full detail in [docs/14](docs/14-seo-and-redirects.md).

@@ -150,6 +150,44 @@ export async function getBlogSitemapEntries(): Promise<
 }
 
 /**
+ * Minimal blog data for `app/llms.txt/route.ts`: the fields the map prints and
+ * the ones that decide whether a post is live. Narrow for the same reason as
+ * the sitemap read, and it throws on a database error: the route lets the
+ * error through, so a failed regeneration keeps serving the last good file
+ * instead of caching an empty list of posts for an hour (docs/14).
+ */
+export async function getLlmsTxtEntries(): Promise<
+  Array<{
+    slug: string
+    title: string
+    excerpt: string | null
+    status: BlogPost['status']
+    publishedAt: string | null
+    unpublishAt: string | null
+  }>
+> {
+  const supabase = createAnonServerClient()
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('slug,title,excerpt,status,published_at,unpublish_at')
+    .or(`status.eq.published,and(status.eq.scheduled,published_at.lte.${now})`)
+    .order('published_at', { ascending: false })
+
+  if (error) throw error
+  return (data || []).map(
+    (row: Pick<BlogPost, 'slug' | 'title' | 'excerpt' | 'status' | 'published_at' | 'unpublish_at'>) => ({
+      slug: row.slug,
+      title: row.title,
+      excerpt: row.excerpt,
+      status: row.status,
+      publishedAt: row.published_at,
+      unpublishAt: row.unpublish_at ?? null,
+    }),
+  )
+}
+
+/**
  * Returns up to `limit` related posts for use on the blog detail page.
  * Selection is deterministic and SQL-driven:
  *   1. Posts that share at least one category with the current post,

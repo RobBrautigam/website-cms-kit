@@ -482,6 +482,7 @@ export default function PostForm({ initialData, staged = null, children }: PostF
         <div className="space-y-6">
           <PostMetaSidebar
             meta={meta}
+            body={body}
             onChange={setMeta}
             statusLockedNote={
               isLive

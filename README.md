@@ -20,7 +20,9 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 | **Audit log** | **Dark theme** |
 | [![Audit log with filters and CSV export](demo/screenshots/audit-log-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/audit) | [![Staging page in the dark theme](demo/screenshots/staging-dark-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) |
 
-**New in 1.6.0:** the public side of the site. A sitemap, `robots.txt`, `llms.txt`, schema and post metadata, all built from one site address and from the posts the public can actually read; a switch that keeps staging out of search; a renamed live post that keeps its old address through a permanent redirect; and a redirect manager that refuses loops and lists chains. See [docs/14](docs/14-seo-and-redirects.md). Since 1.5.0 the demo has [the media library](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media).
+**New in 1.7.0:** content checks on the edit screen. Under the search and share previews, the editor flags an H1 in the body (the title is the page's one H1), skipped heading levels, empty headings, link text like "click here" or a bare address, images without alt text and a slug that is not clean kebab case; and `/llms.txt` keeps its last good copy through a database outage instead of caching an empty list. See [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).
+
+**In 1.6.0:** the public side of the site. A sitemap, `robots.txt`, `llms.txt`, schema and post metadata, all built from one site address and from the posts the public can actually read; a switch that keeps staging out of search; a renamed live post that keeps its old address through a permanent redirect; and a redirect manager that refuses loops and lists chains. See [docs/14](docs/14-seo-and-redirects.md). Since 1.5.0 the demo has [the media library](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media).
 
 ### A five-minute walkthrough
 
@@ -42,7 +44,8 @@ git clone https://github.com/RobBrautigam/website-cms-kit.git
 cd website-cms-kit
 
 # 1. The tests: all six migrations on an in-memory Postgres, the route handlers,
-#    the SEO rules and the redirect checks (264 tests, under a minute).
+#    the SEO rules, the redirect checks and the editor's content checks
+#    (276 tests, under a minute).
 npm ci --prefix source/supabase/tests
 npm test --prefix source/supabase/tests
 
@@ -68,7 +71,7 @@ Then wire it into your own Next.js and Supabase project with the [runbook in doc
 - **Revisions and scheduled publishing (1.4.0).** Every save of a live or scheduled post keeps a revision (who, when, what changed) with a restore that goes through staging; scheduled posts go live on time and any post can come down at an end date, run by Supabase Cron in the database. The two-person lock now covers images and redirects too. See [docs/12](docs/12-revisions-and-scheduling.md).
 - **A media library (1.5.0).** One screen for every image in both buckets: private or public, the posts, staged changes, revisions and testimonials that use it, and its alt text, kept per image and offered when you pick it again in the editor, with no second upload. The database refuses to delete an image anything still uses. An optional server job keeps a scheduled post's images private until its date. See [docs/13](docs/13-media-library.md).
 - **Search and AI ready (1.6.0).** One site address (`NEXT_PUBLIC_SITE_URL`, required in production) behind every canonical, share card, schema id and sitemap entry; Organization, WebSite, BlogPosting and BreadcrumbList schema; `/sitemap.xml`, `/robots.txt` and `/llms.txt` from one list of public pages and the live posts; a noindex switch for staging; a launch checklist. A live post whose address changes gets a permanent redirect from the old one, written by the database with no chains, and the redirect manager refuses loops and lists every chain. See [docs/14](docs/14-seo-and-redirects.md).
-- **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post.
+- **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post. Since 1.7.0 the preview has content checks beside it: one H1, no skipped heading levels, descriptive link text, alt text on every image and a clean slug.
 - **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
 - **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system you re-theme in one file, and Supabase Storage image upload guarded by Storage RLS.
 - **Six SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, staging and approval, hardening, revisions and scheduling, the media library, then the redirects for renamed posts. All six are tested on an in-memory Postgres, no Supabase project needed.
@@ -131,7 +134,7 @@ npm install
 npm test
 ```
 
-The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains and the redirect a renamed post gets are tested the same way. 264 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
+The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains, the redirect a renamed post gets and the editor's content checks are tested the same way. 276 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 
@@ -169,7 +172,7 @@ website-cms-kit/
 | [11-hardening-and-everyday-comforts.md](docs/11-hardening-and-everyday-comforts.md) | 1.3.0: headers and CSP, the same-site check, rate limits, AI output schemas, the append-only audit trigger, the two-person lock, private staged images, and the editor and posts-list comforts. |
 | [12-revisions-and-scheduling.md](docs/12-revisions-and-scheduling.md) | 1.4.0: revisions and restore, scheduled publish and take-down, running the scheduler (Supabase Cron or the host's), and the lock on images and redirects. |
 | [13-media-library.md](docs/13-media-library.md) | 1.5.0: the media library, alt text per image, reuse, the rule that a used image is never deleted, the testimonial image fix, and the optional job for scheduled posts' images. |
-| [14-seo-and-redirects.md](docs/14-seo-and-redirects.md) | 1.6.0: the site address, metadata, schema, sitemap, robots and `llms.txt`, the noindex switch, the redirect a renamed live post gets, chains and loops, and a launch checklist. |
+| [14-seo-and-redirects.md](docs/14-seo-and-redirects.md) | 1.6.0 and 1.7.0: the site address, metadata, schema, sitemap, robots and `llms.txt`, the noindex switch, the editor's content checks, the redirect a renamed live post gets, chains and loops, and a launch checklist. |
 
 ## Tech stack
 

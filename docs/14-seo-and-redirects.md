@@ -80,7 +80,18 @@
 - **Schema says only what the post has.** No author, image, date or category is invented; a missing one is left out. The publisher is the Organization from the root layout, linked by its `@id`.
 - **The sitemap lists what the public can read, nothing else.** Pages from `PUBLIC_ROUTES` and live posts only: a draft, a scheduled post before its date, and a post past its end date stay off, by the same rule as the public read policy. Each post carries its last change and its featured image.
 - **`robots.txt` keeps crawlers out of `/admin` and `/api/`** and names the sitemap by its absolute address.
-- **`llms.txt`** lists the site's pages and live posts with their excerpts, in the plain markdown format AI tools read. A contact line is added only if you pass one.
+- **`llms.txt`** lists the site's pages and live posts with their excerpts, in the plain markdown format AI tools read. A contact line is added only if you pass one. Since 1.7.0 it reads only the fields it prints (`getLlmsTxtEntries()` in `source/lib/data.ts`) and lets a database error through: Next.js keeps serving the last good file when a regeneration fails ([its ISR guide](https://nextjs.org/docs/app/guides/incremental-static-regeneration#handling-uncaught-exceptions), "Handling uncaught exceptions"), where a caught error would have cached a map with no posts for the whole hour. A build that cannot reach the database fails at this route, so the problem shows at deploy time.
+
+## Content checks in the editor (1.7.0)
+
+Under the search and share previews, the edit screen lists what search engines and screen readers would trip on in the body and the address (`source/lib/admin/content-checks.ts`). The checks warn and never block a save; alt text is still the one rule that refuses going live ([docs/11](11-hardening-and-everyday-comforts.md)).
+
+1. **One H1: the post title.** The page template draws the title as the H1, so an H1 in the body (from a paste, an import or the AI route; the toolbar offers only H2 and H3) is flagged.
+2. **No skipped levels.** Headings are read as an outline, so an H3 needs an H2 above it. Going back up (an H3 then an H2) is fine. Levels are judged as the page draws them: the renderer and the check share `renderedHeadingLevel()` in `source/lib/tiptap/schema.ts`, so a stored H4 is drawn and judged as an H3.
+3. **Every heading has text.**
+4. **Link text says where it goes.** "Click here", "read more", "learn more", "this page" and the like, a link with no text, and a link whose text is its bare address are flagged. Text split by a mark ("read **more**") is read as one link.
+5. **Every image in the body has alt text**, counted the same way as the rule that refuses going live.
+6. **A clean slug:** lowercase letters and digits joined by single hyphens (`SLUG_PATTERN`). The editor's slug field already makes one; the check catches a slug written through the Data API or an import, which the proxy and the redirect rules cannot match (see "What it does not do").
 
 ## A renamed live post keeps its old address
 
@@ -126,14 +137,16 @@ A checklist for the day the site goes live, in the order to do it:
 - `source/lib/seo/seo.test.mjs`: the site address rules (production refuses a missing or local address), canonical and absolute addresses, the public visibility rule, titles and descriptions, the metadata and both share cards, the schema and its escaping, the sitemap, robots under both switch settings, and `llms.txt`. 12 tests.
 - `source/supabase/tests/address-redirects.test.mjs`: migration 005 on PGlite. A rename through `publish_staged_posts()` with its audit row; chains collapsed with a pattern left alone; renamed back; renamed twice in one change; a trailing-slash destination; a new post winning back a freed address, created as a draft, then published, and created live; drafts, ended and taken-down posts; a draft renamed and published in one change; a swap; the two-person lock; privileges; and the file re-run. 12 tests.
 - `source/lib/redirects/chains.test.mjs` and `source/supabase/tests/redirect-actions.test.mjs`: chains, loops, the refusal, the site's own full addresses, chains past the hop limit, and the create, edit and switch-on actions refusing a loop, reading past the 1,000-row cap and failing closed. 14 tests.
+- `source/lib/admin/content-checks.test.mjs`: the six content checks, the shared heading level (and that the renderer uses it), link text across marks, and an empty or malformed body. 10 tests.
+- `source/lib/seo/llms-read.test.mjs`: the `llms.txt` read takes only the fields it prints, live posts only, throws on a database error, and the route does not catch it. 2 tests, on the source (the data layer needs a live Supabase client to run).
 
 Each test was seen failing first: every rule it guards was broken on purpose, one at a time, and the suite turned red each time.
 
 ## What it does not do
 
-- **No check of the content itself** (one H1 in the body, skipped heading levels, empty link text). The editor still warns about a long title, a missing description and a missing image ([docs/11](11-hardening-and-everyday-comforts.md)).
+- **The content checks warn; they do not block.** A post with an H1 in the body or vague link text can still be published; only missing alt text stops it.
 - **No check of the share image's size.** Use 1200 by 630; the kit does not measure it.
 - **No author pages.** The schema carries an author only once `resolveAuthor()` is wired.
 - **The redirect tester and the checks for duplicates and reserved paths** are still the demo's proposals.
 - **The loop check runs in the app, not the database.** Two admins saving the two halves of a loop at the same moment can both pass it; the Redirects screen then lists the loop. A database-side check would close that.
-- **A slug outside `a-z`, `0-9` and `-`** (possible through the Data API; the editor never makes one) gets a redirect whose source the proxy will not match, because requests arrive percent-encoded.
+- **A slug outside `a-z`, `0-9` and `-`** (possible through the Data API; the editor never makes one) gets a redirect whose source the proxy will not match, because requests arrive percent-encoded. Since 1.7.0 the edit screen flags such a slug; the database does not refuse it yet.
