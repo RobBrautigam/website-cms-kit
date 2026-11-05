@@ -115,9 +115,10 @@ export async function getBlogSlugs(): Promise<string[]> {
  * fields that decide whether the post is live and when it last changed.
  * Deliberately narrow (NOT `select('*')`) so crawler hits - which can fire
  * every revalidate window - never pull full post bodies just to emit URLs +
- * image entries. Throws on error so the sitemap's own try/catch can fall back
- * to the static pages (the wrapper that swallows errors must not be used here).
- * The sitemap builder applies the live-post rule again on top of RLS.
+ * image entries. Throws on error, and `app/sitemap.ts` lets it through so a
+ * failed regeneration keeps the last good sitemap (the wrapper that swallows
+ * errors must not be used here). The sitemap builder applies the live-post
+ * rule again on top of RLS.
  */
 export async function getBlogSitemapEntries(): Promise<
   Array<{

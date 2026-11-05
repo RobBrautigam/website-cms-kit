@@ -20,7 +20,7 @@ A working version of the admin that runs entirely in your browser. Sign in with 
 | **Audit log** | **Dark theme** |
 | [![Audit log with filters and CSV export](demo/screenshots/audit-log-light-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/audit) | [![Staging page in the dark theme](demo/screenshots/staging-dark-desktop.png)](https://robbrautigam.github.io/website-cms-kit/demo/app/#/staging) |
 
-**New in 1.7.0:** content checks on the edit screen. Under the search and share previews, the editor flags an H1 in the body (the title is the page's one H1), skipped heading levels, empty headings, link text like "click here" or a bare address, images without alt text and a slug that is not clean kebab case; and `/llms.txt` keeps its last good copy through a database outage instead of caching an empty list. See [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).
+**New in 1.7.0:** content checks on the edit screen. Under the search and share previews, the editor flags an H1 in the body (the title is the page's one H1), skipped heading levels, empty headings, link text like "click here" or a bare address, images without alt text and a slug that is not clean kebab case; and `/llms.txt` and `/sitemap.xml` keep their last good copy through a database outage instead of caching one with no posts (so `next build` now needs the database). See [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).
 
 **In 1.6.0:** the public side of the site. A sitemap, `robots.txt`, `llms.txt`, schema and post metadata, all built from one site address and from the posts the public can actually read; a switch that keeps staging out of search; a renamed live post that keeps its old address through a permanent redirect; and a redirect manager that refuses loops and lists chains. See [docs/14](docs/14-seo-and-redirects.md). Since 1.5.0 the demo has [the media library](https://robbrautigam.github.io/website-cms-kit/demo/app/#/media).
 
@@ -45,7 +45,7 @@ cd website-cms-kit
 
 # 1. The tests: all six migrations on an in-memory Postgres, the route handlers,
 #    the SEO rules, the redirect checks and the editor's content checks
-#    (276 tests, under a minute).
+#    (280 tests, under a minute).
 npm ci --prefix source/supabase/tests
 npm test --prefix source/supabase/tests
 
@@ -134,7 +134,7 @@ npm install
 npm test
 ```
 
-The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains, the redirect a renamed post gets and the editor's content checks are tested the same way. 276 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
+The tests load all six migrations into an in-memory database with a small stand-in for Supabase's `auth` and `storage` schemas, then check every staging rule as the public key, a signed-in user without an admin role, a deactivated admin, an admin who has not set up two-factor yet, and admins with two-factor set up, both before and after they complete it in the session. The route tests run the real handlers against small stand-ins for Next.js and Supabase: the same-site check, the password before new recovery codes, the AI limits, daily cap, spend record and schemas, the password and recovery-code limits, the redirect counter, image promotion and its ledger, live-post autosave, restoring a revision, the media library's alt text and delete rules, the scheduled-images job, and the redirect actions refusing a loop. The SEO rules, the redirect chains, the redirect a renamed post gets and the editor's content checks are tested the same way. 280 tests in all. The kit also type-checks on its own against the Next.js 16.4 types (`cd source/typecheck && npm ci && npm run typecheck`).
 
 ## 60-second tour
 

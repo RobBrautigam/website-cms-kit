@@ -25,6 +25,19 @@ test('llms.txt read: the fields it prints, live posts only, and it throws on a d
   assert.ok(!body.includes('catch'), 'and not swallowed')
 })
 
+test('sitemap: the narrow read, and its error is not caught (a failed regeneration keeps the last good sitemap)', () => {
+  const body = functionBody(read('../data.ts'), 'getBlogSitemapEntries')
+  assert.ok(body.includes('if (error) throw error'), 'a database error is thrown')
+  assert.ok(!body.includes('catch'), 'and not swallowed in the read')
+  const code = read('../../app/sitemap.ts')
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('//'))
+    .join('\n')
+  assert.ok(code.includes('await getBlogSitemapEntries()'), 'the narrow read')
+  assert.ok(!code.includes('catch'), 'no catch around the read')
+  assert.ok(code.includes('export const revalidate = 3600'), 'still regenerated hourly')
+})
+
 test('llms.txt route: uses the narrow read and does not catch its error', () => {
   const route = read('../../app/llms.txt/route.ts')
   const code = route

@@ -3,7 +3,8 @@
 import ImageUploader from './ImageUploader'
 import AdminImage from './AdminImage'
 import { searchPreview, socialPreview } from '@/lib/admin/previews'
-import { contentChecks } from '@/lib/admin/content-checks'
+import { contentChecks, slugify } from '@/lib/admin/content-checks'
+import { useMemo } from 'react'
 
 // The public site's address for the previews (docs/09). A placeholder until set.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.example.com'
@@ -48,14 +49,6 @@ interface PostMetaSidebarProps {
   /** When set, the status select is read-only and this note explains why
    *  (a live post's edits go through staging; see docs/10). */
   statusLockedNote?: string
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 96)
 }
 
 export default function PostMetaSidebar({ meta, body, onChange, statusLockedNote }: PostMetaSidebarProps) {
@@ -298,7 +291,9 @@ function PostPreviews({ meta }: { meta: PostMeta }) {
  * on every image and a clean slug. Advisory: none of them blocks a save.
  */
 function ContentChecks({ body, slug }: { body?: unknown; slug: string }) {
-  const warnings = contentChecks({ body, slug })
+  // Recomputed only when the body or the slug changes, not on every keystroke
+  // in another field.
+  const warnings = useMemo(() => contentChecks({ body, slug }), [body, slug])
   return (
     <div className="space-y-2" data-checks="content">
       <p className="block text-sm font-semibold text-text-secondary">Content Checks</p>

@@ -72,11 +72,12 @@ function linkHref(node: Node): string | null {
 }
 
 /**
- * Every link's text in document order. Neighboring text nodes that carry the
- * same link are one link ("read **more**" is split by the bold mark).
+ * Every link in the body, with its address and its text. Neighboring text
+ * nodes that carry the same link are read as one link, as a reader sees it
+ * ("read **more**" is split by the bold mark).
  */
-export function linkTexts(body: unknown): string[] {
-  const out: string[] = []
+export function bodyLinks(body: unknown): Array<{ href: string; text: string }> {
+  const out: Array<{ href: string; text: string }> = []
   const walk = (node: Node | undefined) => {
     if (!node || typeof node !== 'object' || !Array.isArray(node.content)) return
     const runs: Array<{ href: string; text: string }> = []
@@ -94,19 +95,32 @@ export function linkTexts(body: unknown): string[] {
       else runs.push({ href, text })
       open = true
     }
-    for (const r of runs) out.push(r.text)
+    for (const r of runs) out.push(r)
   }
   walk(body as Node)
   return out
 }
 
-/** The body's headings in document order, at the level the page draws. */
-export function bodyHeadings(body: unknown): Array<{ level: 1 | 2 | 3; text: string }> {
-  const out: Array<{ level: 1 | 2 | 3; text: string }> = []
+/** Every link's text, in the order of bodyLinks(). */
+export function linkTexts(body: unknown): string[] {
+  return bodyLinks(body).map((l) => l.text)
+}
+
+/**
+ * The body's headings in document order: `level` is the level the page draws;
+ * `inEditor` is the level the editor shows, which offers only H2 and H3 and
+ * shows any other stored level (an H1 or H4 from an import) as an H2.
+ */
+export function bodyHeadings(body: unknown): Array<{ level: 1 | 2 | 3; inEditor: 2 | 3; text: string }> {
+  const out: Array<{ level: 1 | 2 | 3; inEditor: 2 | 3; text: string }> = []
   const walk = (node: Node | undefined) => {
     if (!node || typeof node !== 'object') return
     if (node.type === 'heading') {
-      out.push({ level: renderedHeadingLevel(node.attrs?.level), text: plainText(node).trim().replace(/\s+/g, ' ') })
+      out.push({
+        level: renderedHeadingLevel(node.attrs?.level),
+        inEditor: node.attrs?.level === 3 ? 3 : 2,
+        text: plainText(node).trim().replace(/\s+/g, ' '),
+      })
       return
     }
     if (Array.isArray(node.content)) node.content.forEach(walk)
@@ -121,10 +135,34 @@ function vague(text: string): boolean {
   const t = text
     .toLowerCase()
     .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[\s.,:;!?…»›→>]+$/u, '')
-    .trim()
+    .replace(/^[\s"'“”‘’(«‹←→<>-]+/u, '')
+    .replace(/[\s"'“”‘’).,:;!?…»›→>-]+$/u, '')
   return VAGUE_LINK_TEXT.has(t)
+}
+
+/** An address with its scheme, a leading www. and a trailing slash dropped. */
+function bareAddress(value: string): string {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
+}
+
+/** The link's text is its own address, or reads as one (http:// or www.). */
+function showsAddress(link: { href: string; text: string }): boolean {
+  if (BARE_ADDRESS.test(link.text)) return true
+  return link.href.trim() !== '' && bareAddress(link.text) === bareAddress(link.href)
+}
+
+/**
+ * A slug from a title or a typed slug: lowercase letters and digits joined by
+ * single hyphens, at most 96 characters, cut before the ends are trimmed so a
+ * long title never leaves a trailing hyphen. The edit screen's slug field
+ * uses it, so a slug the editor makes always passes SLUG_PATTERN.
+ */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .slice(0, 96)
+    .replace(/^-+|-+$/g, '')
 }
 
 function list(items: string[]): string {
@@ -138,27 +176,31 @@ export function contentChecks({ body, slug }: ContentCheckInput): string[] {
   const warnings: string[] = []
   const headings = bodyHeadings(body)
 
-  const h1s = headings.filter((h) => h.level === 1).length
-  if (h1s === 1) warnings.push('The body has an H1. The post title is the page\'s one H1; make it an H2.')
-  if (h1s > 1) warnings.push(`The body has ${h1s} H1 headings. The post title is the page's one H1; make them H2.`)
+  const h1s = headings.filter((h) => h.level === 1)
+  const h1Names = h1s.filter((h) => h.text).map((h) => quote(h.text))
+  const named = h1Names.length ? ` (${list(h1Names)})` : ''
+  if (h1s.length === 1) warnings.push(`The body has an H1${named}, shown as an H2 in the editor. The post title is the page's one H1; select the heading and press H2.`)
+  if (h1s.length > 1) warnings.push(`The body has ${h1s.length} H1 headings${named}, shown as H2 in the editor. The post title is the page's one H1; select each and press H2.`)
 
-  const skipped: string[] = []
+  const skipped: Array<{ name: string; inEditor: 2 | 3 }> = []
   let previous = 1 // the post title
   for (const h of headings) {
-    if (h.level > previous + 1 && h.text) skipped.push(quote(h.text))
+    if (h.level > previous + 1 && h.text) skipped.push({ name: quote(h.text), inEditor: h.inEditor })
     previous = h.level
   }
-  if (skipped.length === 1) warnings.push(`The heading ${skipped[0]} is an H3 with no H2 above it. Headings are read as an outline; go down one level at a time.`)
-  if (skipped.length > 1) warnings.push(`${skipped.length} H3 headings have no H2 above them (${list(skipped)}). Headings are read as an outline; go down one level at a time.`)
+  // A stored H4 to H6 is drawn as an H3 but shown as an H2 in the editor.
+  const shownAsH2 = skipped.some((s) => s.inEditor === 2) ? ' The editor shows a heading stored deeper than H3 as an H2; press H3 on it to set its level.' : ''
+  if (skipped.length === 1) warnings.push(`The heading ${skipped[0].name} is drawn as an H3 with no H2 above it. Headings are read as an outline; go down one level at a time.${shownAsH2}`)
+  if (skipped.length > 1) warnings.push(`${skipped.length} headings are drawn as H3 with no H2 above them (${list(skipped.map((s) => s.name))}). Headings are read as an outline; go down one level at a time.${shownAsH2}`)
 
   const empty = headings.filter((h) => !h.text).length
   if (empty === 1) warnings.push('1 heading has no text.')
   if (empty > 1) warnings.push(`${empty} headings have no text.`)
 
-  const links = linkTexts(body).map((t) => t.trim().replace(/\s+/g, ' '))
-  const blankLinks = links.filter((t) => !t).length
-  const vagueLinks = links.filter((t) => t && vague(t))
-  const addressLinks = links.filter((t) => t && !vague(t) && BARE_ADDRESS.test(t))
+  const links = bodyLinks(body).map((l) => ({ href: l.href, text: l.text.trim().replace(/\s+/g, ' ') }))
+  const blankLinks = links.filter((l) => !l.text).length
+  const vagueLinks = links.filter((l) => l.text && vague(l.text)).map((l) => l.text)
+  const addressLinks = links.filter((l) => l.text && !vague(l.text) && showsAddress(l))
   if (blankLinks > 0) warnings.push(blankLinks === 1 ? '1 link has no text.' : `${blankLinks} links have no text.`)
   if (vagueLinks.length > 0) {
     const names = [...new Set(vagueLinks.map(quote))]
