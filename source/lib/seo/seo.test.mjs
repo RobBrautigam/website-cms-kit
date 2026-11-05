@@ -124,12 +124,12 @@ test('site-wide schema and breadcrumbs point at one organization and absolute ad
 })
 
 test('the JSON-LD script text cannot be closed early by a field, and parses back to the same data', () => {
-  const data = { headline: 'Evil </script><script>alert(1)</script> & <!-- more', note: 'line sep' }
+  const data = { headline: 'Evil </script><script>alert(1)</script> & <!-- more', note: 'line\u2028sep' }
   const text = jsonLdScriptContent(data)
   assert.equal(/<\/?script/i.test(text), false)
   assert.equal(text.includes('<'), false)
   assert.equal(text.includes('&'), false)
-  assert.equal(text.includes(' '), false)
+  assert.equal(text.includes('\u2028'), false)
   assert.deepEqual(JSON.parse(text), data)
 })
 

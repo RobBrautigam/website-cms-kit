@@ -2,6 +2,27 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## 1.7.0 (2026-11-05)
+
+Content checks in the editor, and a `/llms.txt` that survives a database outage. No migration. Full detail in [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).
+
+### Added
+
+- **Content checks on the edit screen** (`lib/admin/content-checks.ts`), under the search and share previews: an H1 in the body (the title is the page's one H1), an H3 with no H2 above it, a heading with no text, link text that does not say where it goes ("click here", "read more", the link's own address, no text), images without alt text, and a slug that is not lowercase letters and digits joined by single hyphens. They warn and never block a save.
+- **One heading level for the page and the check** (`renderedHeadingLevel()` in `lib/tiptap/schema.ts`): the public renderer draws headings through it, so the check judges the page a reader gets.
+- 16 more tests (280 in all), each seen failing first by breaking the rule it guards.
+
+### Fixed
+
+- **`/llms.txt` and `/sitemap.xml` no longer cache a list with no posts for an hour after a database error.** `/llms.txt` reads only the fields it prints (`getLlmsTxtEntries()`), and in both files the error goes through, so Next.js keeps serving the last good file and retries on the next request.
+- **A long title no longer leaves a slug ending in a hyphen.** The editor's `slugify()` moved to `lib/admin/content-checks.ts` and cuts at 96 characters before trimming the ends.
+- Two test strings in `lib/seo/seo.test.mjs` held a raw line separator character; they are escape sequences now.
+
+### Changed
+
+- **`next build` now needs the database.** With the database unreachable or the Supabase variables unset, the build fails at `/llms.txt` and `/sitemap.xml` instead of shipping both without posts. Build where the Supabase variables are set ([docs/09](docs/09-environment-and-deploy.md#deploy)).
+- `APP_VERSION` reads `v1.7.0`. The post form passes the editor's body to the sidebar for the checks.
+
 ## 1.6.0 (2026-11-02)
 
 The public side of the site: what search engines and AI answer engines read, and old addresses that keep working. Run `005_post_address_redirects.sql` after 004. Full detail in [docs/14](docs/14-seo-and-redirects.md).

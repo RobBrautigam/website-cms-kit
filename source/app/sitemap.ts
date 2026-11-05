@@ -4,18 +4,17 @@ import type { MetadataRoute } from 'next'
 import { getBlogSitemapEntries } from '@/lib/data'
 import { PUBLIC_ROUTES } from '@/lib/seo/routes'
 import { siteConfig } from '@/lib/seo/site'
-import { buildSitemap, type SitemapPost } from '@/lib/seo/sitemap'
+import { buildSitemap } from '@/lib/seo/sitemap'
 
 export const revalidate = 3600
 
+// The posts come from a narrow read that throws on a database error, and this
+// file does not catch it (since 1.7.0): Next.js keeps serving the last good
+// sitemap when a regeneration fails, where a caught error would cache a
+// sitemap with no posts for the whole revalidate window. A build that cannot
+// reach the database fails here (docs/14).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = siteConfig()
-  let posts: SitemapPost[] = []
-  try {
-    posts = await getBlogSitemapEntries()
-  } catch (e) {
-    // A database outage still serves the static pages rather than an error.
-    console.error('sitemap: could not read posts', e)
-  }
+  const posts = await getBlogSitemapEntries()
   return buildSitemap({ site, routes: PUBLIC_ROUTES, posts })
 }

@@ -3,6 +3,7 @@
 import React from 'react'
 import Image from 'next/image'
 import { isSafeHref } from '@/lib/safe-href'
+import { renderedHeadingLevel } from '@/lib/tiptap/schema'
 
 interface TipTapNode {
   type: string
@@ -115,7 +116,7 @@ function renderNode(node: TipTapNode, index: number): React.ReactNode {
 
   switch (node.type) {
     case 'heading': {
-      const level = (node.attrs?.level as number) || 2
+      const level = renderedHeadingLevel(node.attrs?.level)
       if (level === 1)
         return <h1 key={index} className="heading-display text-4xl mt-12 mb-6">{children}</h1>
       if (level === 2)

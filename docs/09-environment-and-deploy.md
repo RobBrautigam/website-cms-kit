@@ -75,7 +75,7 @@ npm run build      # if this fails on a missing module, it's misclassified
 The kit is host-agnostic - any Node host that runs `next build` + `next start` works (Railway, Render, Fly, a container, etc.). The deploy is also your build gate: a broken build fails the deploy and the host keeps serving the last good version.
 
 Generic flow:
-1. Set the env vars in the host dashboard (the three Supabase values, `NEXT_PUBLIC_SITE_URL`, and any optional ones you use, with the service-role key marked secret/server-only). Give staging and preview environments `NEXT_PUBLIC_NOINDEX=1`.
+1. Set the env vars in the host dashboard (the three Supabase values, `NEXT_PUBLIC_SITE_URL`, and any optional ones you use, with the service-role key marked secret/server-only). Give staging and preview environments `NEXT_PUBLIC_NOINDEX=1`. Since 1.7.0 the build reads the live posts for `/sitemap.xml` and `/llms.txt` and fails if it cannot, so the Supabase values must be set (and the database reachable) wherever `next build` runs, a CI or Docker build included.
 2. Connect the repo; the host builds on push.
 3. After deploy, verify the live URL: sign in, confirm a protected route redirects when signed out, confirm a published row renders and a draft does not, and open `/robots.txt` and `/sitemap.xml` ([docs/14](14-seo-and-redirects.md#before-launch)).
 
