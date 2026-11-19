@@ -2,6 +2,16 @@
 
 All notable changes to this kit. Dates are when the change landed on `main`.
 
+## Unreleased (2026-11-19)
+
+Unused code removed; nothing the kit does changed. No migration.
+
+### Removed
+
+- **The redirect lookup's two test hooks**, `_resetLookupForTests()` and `_setSupabaseClientForTests()` (`lib/redirects/lookup.ts`), and the client override only they set. No test called them.
+- **`__resetBodyScrollLockForTests()`** (`lib/a11y/useBodyScrollLock.ts`). No test called it.
+- **The `UserRole` interface** (`lib/supabase/types.ts`). Nothing used it, and it left out the table's `deactivated_at` column. `UserRoleRow` (`lib/auth/types.ts`), which carries that column, stays.
+
 ## 1.7.0 (2026-11-05)
 
 Content checks in the editor, and a `/llms.txt` that survives a database outage. No migration. Full detail in [docs/14](docs/14-seo-and-redirects.md#content-checks-in-the-editor-170).

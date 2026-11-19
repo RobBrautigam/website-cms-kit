@@ -33,15 +33,3 @@ export function useBodyScrollLock(active: boolean): void {
     }
   }, [active])
 }
-
-/**
- * Test-only helper. Resets module-level state so tests don't leak across each
- * other. Call from `beforeEach`. Not part of the production API.
- */
-export function __resetBodyScrollLockForTests(): void {
-  lockCount = 0
-  priorOverflow = null
-  if (typeof document !== 'undefined') {
-    document.body.style.overflow = ''
-  }
-}

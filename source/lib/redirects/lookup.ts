@@ -13,10 +13,8 @@ interface CacheState {
 
 let cache: CacheState | null = null;
 let inflight: Promise<CacheState> | null = null;
-let injectedClient: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
-  if (injectedClient) return injectedClient;
   // Anon client - RLS limits SELECT to enabled rows.
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -127,16 +125,4 @@ export async function recordHit(redirectId: string, callerKey: string): Promise<
   } catch {
     // Swallow - hit_count is best-effort.
   }
-}
-
-// Test helpers (exported with underscore prefix to mark internal use)
-export function _resetLookupForTests() {
-  cache = null;
-  inflight = null;
-  injectedClient = null;
-}
-export function _setSupabaseClientForTests(client: SupabaseClient) {
-  injectedClient = client;
-  cache = null;
-  inflight = null;
 }
