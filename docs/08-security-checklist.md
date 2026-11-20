@@ -54,13 +54,13 @@ Since 1.3.0 the kit ships them: `source/next.config.ts` sends a fixed set on eve
 
 - [ ] **Merge `next.config.ts` into yours** if your app already has one, so the headers actually ship.
 - [ ] **Watch the CSP reports, then enforce.** Set `CSP_REPORT_URI` to collect them; once the admin reports nothing unexpected, set `CSP_MODE=enforce`. `CSP_SCOPE=site` extends the policy to the public pages (read docs/11 first: statically rendered pages carry no nonce). The interactive demo in `demo/app/` runs under a strict enforced CSP (no inline script, no inline style).
-- [ ] **Only send HSTS once HTTPS works everywhere on the domain**, subdomains included, or drop `includeSubDomains` and `preload` in `lib/security/headers.ts`.
+- [ ] **Only set `HSTS_PRELOAD=1` once HTTPS works everywhere on the domain**, subdomains included. By default the HSTS header is `max-age=63072000` for this host only; `HSTS_PRELOAD=1` adds `includeSubDomains` and `preload` (`lib/security/headers.ts`, [docs/09](09-environment-and-deploy.md#hsts-and-the-preload-list)).
 
 ## Rate limits
 
 - [ ] **Keep Supabase Auth's built-in limits on** (Dashboard -> Authentication -> Rate Limits): sign-in attempts, token refreshes, TOTP verification and emails sent. They are the brute-force protection for the login and two-factor screens.
 - [ ] **Run migration 002 for the app's own limits.** The `/api/ai/*` routes share a budget per admin (20 calls in 10 minutes by default) and refuse when the limiter is down; the redirect counter is counted by the server only, per visitor and per redirect, and the public key can no longer bump it. Both live in the database ([docs/11](11-hardening-and-everyday-comforts.md#per-caller-limits)). Treat redirect counts as analytics, never as security data, and make sure the address header your host sets is the one `clientAddress()` reads.
-- [ ] **Know what covers the recovery-code screen.** Recovery codes are checked by the app, not by Supabase Auth, so Auth's TOTP limit does not apply to them. They hold up anyway: each is 12 characters from a 32-letter alphabet (60 bits), bcrypt-hashed and single-use, and the screen is only reachable with a correct password. A per-user attempt limit on `/api/admin/mfa/verify` is still a cheap extra.
+- [ ] **Know what covers the recovery-code screen.** Recovery codes are checked by the app, not by Supabase Auth, so Auth's TOTP limit does not apply to them. They hold up anyway: each is 12 characters from a 32-letter alphabet (60 bits), bcrypt-hashed and single-use, and the screen is only reachable with a correct password. Since 1.4.0 `/api/admin/mfa/verify` also limits recovery-code attempts per admin (5 in 15 minutes, `RATE_LIMITS.recoveryCode` in `lib/security/rate-limit.ts`) and writes an audit row for each wrong code and each limited try.
 
 ## Before you go live
 

@@ -22,7 +22,7 @@ Four functions gate server code. Use the strictest one that fits:
 |---|---|---|
 | `requireAdmin()` | Active admin (or super) + **MFA satisfied (AAL2)**. Redirects otherwise. | Every protected page, layout, and content mutation. |
 | `requireSuperAdmin()` | All of the above + role is `super_admin`. | Team management pages + `/api/admin/users/*`. |
-| `requirePartialAdmin()` | Active admin, but does NOT enforce the AAL/enrollment gate. | ONLY the MFA-flow routes themselves (`login/verify`, `security/enroll`, `/api/admin/mfa/*`) - using `requireAdmin` there would infinite-loop. |
+| `requirePartialAdmin()` | Active admin, but does NOT enforce the AAL/enrollment gate. | ONLY the MFA-flow routes themselves (`login/verify`, `security/enroll`, `/api/admin/auth/log-success`, and the `/api/admin/mfa/*` routes except `disable` and `regenerate-codes`, which change two-factor and use `requireAdmin()`) - using `requireAdmin` there would infinite-loop. |
 | `getAdminRoleOrNull()` | Returns the role without redirecting. | Read-only role checks; use sparingly (prefer the role passed down from the layout). |
 
 `requireAdmin()` reads the user's role with the **service-role client** so it works regardless of the `user_roles` self-RLS shape, checks `deactivated_at`, then enforces MFA: if a verified factor exists but the session is still `aal1`, redirect to the TOTP challenge; if no factor exists and the grace window has elapsed, redirect to forced enrollment.
