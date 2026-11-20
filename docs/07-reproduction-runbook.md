@@ -11,7 +11,7 @@ Stand up the admin CMS on a fresh Next.js 16 + Supabase project, in order. Each 
 ## 1. Install dependencies
 
 ```bash
-npm i @supabase/ssr@^0.10 @supabase/supabase-js server-only zod react-hook-form @hookform/resolvers sonner lucide-react bcryptjs
+npm i @supabase/ssr@^0.12 @supabase/supabase-js server-only zod sonner lucide-react bcryptjs
 # Rich-text editor (posts resource). TipTap 3's StarterKit includes Link and Underline:
 npm i @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-placeholder @tiptap/pm
 # Help page renderer (optional):
@@ -86,6 +86,9 @@ Copy `source/` into your app, preserving the tree, mapped onto `src/`:
 | `source/lib/**` | `src/lib/**` |
 | `source/components/**` | `src/components/**` |
 | `source/app/globals.css` | merge into your root CSS (or import it) |
+| `source/app/blog/[slug]/page.tsx` | `src/app/blog/[slug]/page.tsx` (an example public post page; [docs/14](14-seo-and-redirects.md)) |
+| `source/app/sitemap.ts`, `source/app/robots.ts`, `source/app/llms.txt/**` | `src/app/sitemap.ts`, `src/app/robots.ts`, `src/app/llms.txt/**` |
+| `source/next.config.ts` | merge into the `next.config.ts` at your project root, so the security headers ship ([docs/08](08-security-checklist.md#security-headers)); point its `./lib/security/headers` import at your `src/lib` |
 
 Set the `@/*` path alias in `tsconfig.json`:
 
@@ -124,6 +127,6 @@ If all of that works, the admin CMS is live.
 
 - **Existing proxy/middleware**: merge the `/admin` gating into your current proxy rather than replacing it. The auth concern is the `updateSession()` call; keep your other proxy responsibilities.
 - **Existing `user_roles` / auth**: if you already have users, just add the role helpers + the `user_roles` columns (`deactivated_at`, the role CHECK) and backfill roles. Don't drop your existing auth.
-- **Route collisions**: if `/admin` is taken, namespace the kit (e.g. `/console`) by renaming the `app/admin` and `app/(admin)/admin` folders and updating the proxy matcher + the redirect targets in `lib/supabase/middleware.ts` and `lib/auth/require.ts`.
+- **Route collisions**: if `/admin` is taken, namespace the kit (e.g. `/console`) by renaming the `app/admin` and `app/(admin)/admin` folders and every `/admin` path the code names: the `/admin` checks in the body of `proxy.ts` (its matcher does not name `/admin`), the redirect targets in `lib/supabase/middleware.ts` and `lib/auth/require.ts`, and the sidebar links, redirects, revalidations and fetches elsewhere. Search the source for `/admin`: it appears in over 40 files.
 - **Design tokens**: if you already have a token layer, map the kit's semantic names (`bg-bg-card`, `text-text-primary`, `text-accent`, `border-border`, `btn-primary`) onto your tokens instead of importing the kit's `globals.css` wholesale.
 - **Drop what you don't need**: the redirects resource (+ its proxy block + the beacon), the AI routes, and individual content resources are all independent. Delete any you don't want.

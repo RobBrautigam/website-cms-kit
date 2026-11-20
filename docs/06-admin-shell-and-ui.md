@@ -33,9 +33,9 @@ These are deliberately small and composable. They encode the fiddly correctness 
 
 ## The design-token system (`source/app/globals.css`)
 
-Components never use raw colors. They use **semantic token classes**: `bg-bg-card`, `bg-bg-white`, `text-text-primary`, `text-text-secondary`, `text-accent`, `border-border`, plus component classes `btn-primary`, `btn-outline`, `card`, `heading-display`. All of them resolve to CSS custom properties defined in one `:root` block in `globals.css`, mapped to Tailwind v4 utilities via `@theme inline`.
+Components mostly use **semantic token classes**: `bg-bg-card`, `bg-bg-white`, `text-text-primary`, `text-text-secondary`, `text-accent`, `border-border`, plus component classes `btn-primary`, `btn-outline`, `card`, `heading-display`. All of them resolve to CSS custom properties defined in one `:root` block in `globals.css`, mapped to Tailwind v4 utilities via `@theme inline`. Some surfaces and status colors still use raw Tailwind palette classes (`bg-white`, `text-white`, `text-red-600`, `text-amber-700`, `text-green-700` and others), and `globals.css` maps several of them for the dark theme by hand.
 
-To re-theme the entire admin surface, edit the values in that one `:root` block (the kit ships a neutral slate + blue palette). Nothing else needs to change. This is the design-token discipline Linear/Stripe/Vercel use, and it is why the kit has zero hardcoded hex values in components and no dependency on any external design-token package.
+To re-theme the admin surface, edit the values in the `:root` block (the kit ships a neutral slate + blue palette), the `[data-admin-theme="dark"]` block and the system-theme block after it, and change those raw palette classes where your palette differs. This is the design-token discipline Linear/Stripe/Vercel use, and it is why the kit has zero hardcoded hex values in components and no dependency on any external design-token package.
 
 Fonts are `--font-display` / `--font-body` (a system stack by default - point them at your own webfonts). The `.tiptap` rules style the rich-text editor and rendered article prose.
 
