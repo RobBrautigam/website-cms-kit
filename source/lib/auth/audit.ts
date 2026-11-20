@@ -80,12 +80,19 @@ export interface RecordAdminActionInput {
   resource_id?: string;
   payload?: Record<string, unknown>;
   /**
-   * Override the actor, for server code that runs inside a Next.js request
-   * with no signed-in user (a cron route of your own, say). This function
-   * reads the request's headers, so it cannot run in a standalone script.
-   * No route or action in the kit passes one: without it the session's user
-   * is the actor, which is right for user.recover_password too (the super
-   * admin acts, the target user is the resource).
+   * Override the actor with a real user's id, for server code that runs
+   * inside a Next.js request on that user's behalf without their session
+   * (when set, the session lookup is skipped). The column references
+   * auth.users, so any other id fails the insert and the row is lost (the
+   * error is only logged). Pass actor_email with it, or the row reads
+   * "(unknown)". A job with no user, such as a cron route of your own,
+   * leaves this unset and passes actor_email, as migration 003's scheduler
+   * does in SQL (actor_email "scheduler", no user id); it may also pass
+   * actor_role "system". This function reads the request's headers, so it
+   * cannot run in a standalone script. No route or action in the kit
+   * passes actor_user_id: without it the session's user is the actor, which
+   * is right for user.recover_password too (the super admin acts, the
+   * target user is the resource).
    */
   actor_user_id?: string;
   actor_email?: string;
