@@ -52,7 +52,8 @@ Why three and not one: the proxy is fast but coarse (it only knows "is there a s
 
 ```
 source/
-  proxy.ts                      Next 16 proxy: session refresh + /admin gating (+ optional redirect lookup)
+  proxy.ts                      Next 16 proxy: session refresh + /admin gating + the Content Security Policy (+ optional redirect lookup)
+  next.config.ts                the fixed security headers (merge into your own)
   app/
     admin/                      PUBLIC auth pages (outside the protected group):
       login/ forgot-password/ reset-password/ login/verify/ security/enroll/
@@ -66,6 +67,7 @@ source/
         staging/                staged post changes: review, approve, compare, publish selected
         team/                   super-admin user management
         audit-log/              filterable log + CSV export
+        media/                  media library: both image buckets, alt text, where each image is used
         settings/               2FA + change password
         sitemap/ help/          utility pages
     blog/[slug]/page.tsx        example public post page: metadata, schema, staging preview (docs/14)
@@ -73,22 +75,32 @@ source/
     api/
       admin/auth/ admin/mfa/ admin/users/        admin-only JSON endpoints
       admin/preview/            turn the whole-site preview (Next.js draft mode) on and off
+      admin/staged-image/       a short-lived signed link to an image that is not public yet
       ai/                       optional Claude content generation
+      cron/scheduled-publishing/   optional job for scheduled posts' images, called with CRON_SECRET (docs/13)
       upload/ revalidate/ redirects/hit/         image upload, ISR hook, redirect telemetry
   lib/
     supabase/                   client factories + session-refresh helper + resource data layers
-    auth/                       require gates, role types, MFA, audit writer, team queries, password rules
-    admin/                      ActionResult discriminated union
+    auth/                       require gates, role types, MFA, audit writer, team queries, password rules, password re-check + the per-admin password and recovery-code limits
+    admin/                      ActionResult discriminated union, image upload, autosave, alt text, bulk actions, content checks, search and share previews, theme cookie
+    ai/                         AI output schemas + the AI spend record
+    media/                      media library: one list from both buckets and the promotion ledger, and its loader
+    security/                   security headers, CSP, same-site check, rate limits, cron secret check
+    tiptap/                     the nodes and marks the site draws
     redirects/                  redirect lookup + matching + validation + chains and loops (backs the proxy + resource)
     seo/                        site address, metadata, JSON-LD, sitemap, robots, llms.txt, the public route list
-    staging/                    staging rules, staged-change queries, preview reads (draft mode only)
+    staging/                    staging rules, staged-change queries, preview reads (draft mode only), private images and their promotion, orphan cleanup, scheduled-post images
     a11y/                       focus trap, scroll lock, media query, reduced motion
+    data.ts                     public data layer: live posts on the anon key
+    safe-href.ts utils.ts version.ts   link allowlist, word count, app version
   components/
     admin/                      AdminShell, nav, primitives, MFA UI, resource UI
+    ThemeProvider.tsx           the admin's light, dark or system theme
+    LogoMark.tsx                placeholder logo mark
     TipTapRenderer.tsx          renders TipTap JSON to article HTML
     JsonLd.tsx                  one escaped application/ld+json script (server component)
     redirects/RedirectBeacon.tsx  optional internal-redirect hit telemetry
-  app/globals.css               neutral design tokens + component classes (re-theme here)
+  app/globals.css               neutral design tokens + component classes (most of a re-theme happens here; docs/06)
   supabase/migrations/000_admin_cms_schema.sql   the whole schema + RLS
   supabase/migrations/001_staging_and_approval.sql   staged post changes + RLS + review trigger
   supabase/migrations/002_hardening.sql   append-only audit, rate limits, two-person lock, staged images
@@ -96,6 +108,7 @@ source/
   supabase/migrations/004_media_library.sql   alt text per image, a used image is never deleted
   supabase/migrations/005_post_address_redirects.sql   a renamed live post keeps its old address (permanent redirect)
   supabase/tests/               database tests on an in-memory Postgres (npm test)
+  typecheck/                    a pinned project that type-checks the kit (npm run typecheck)
 ```
 
 ## Key conventions
@@ -103,7 +116,7 @@ source/
 - **Route groups split public from protected.** Auth pages live under `app/admin/` (no shell, reachable signed-out). Everything behind the gate lives under `app/(admin)/` (the `(admin)` folder name is a Next.js route group - it does not appear in the URL).
 - **Server components fetch, client components interact.** Pages are server components that call `requireAdmin()` and query Supabase. Tables/forms are `'use client'` and talk back via server actions.
 - **Mutations are server actions returning `ActionResult`.** A single discriminated union (`source/lib/admin/action-result.ts`) gives every mutation a uniform `{ok:true}` / `{ok:false, error, code}` shape the UI can branch on.
-- **Semantic design tokens, not raw colors.** Components use classes like `bg-bg-card`, `text-text-primary`, `text-accent`. They are defined once in `source/app/globals.css`; re-theme by editing that file.
+- **Semantic design tokens, mostly.** Components use classes like `bg-bg-card`, `text-text-primary`, `text-accent`. They are defined once in `source/app/globals.css`. Some surfaces and status colors still use raw Tailwind classes (`bg-white`, `text-red-600`, `text-amber-700` and others), so a full re-theme edits that file and those classes ([06](06-admin-shell-and-ui.md)).
 
 ## Next steps
 

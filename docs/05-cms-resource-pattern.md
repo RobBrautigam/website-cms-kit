@@ -77,7 +77,7 @@ One `<Resource>Form` component takes optional `initialData`. `new/page.tsx` rend
 - `ToggleButton` - optimistic on/off (publish/draft, active/inactive). Takes a bound server action.
 - `ConfirmDialog` / `ModalShell` - accessible modal with focus trap, escape, backdrop dismiss.
 - `SubmitButton` - disables while the form action is pending (`useFormStatus`).
-- `ImageUploader` - uploads to the `blog-images` Storage bucket, returns the public URL.
+- `ImageUploader` - uploads to the private `blog-images-staged` Storage bucket and returns the public URL the image will have once it is made public: when its post is published or scheduled (with `SCHEDULED_IMAGES=at_publish`, by the post's date), or when the testimonial using it is saved. A new resource that shows images must make them public on save the way testimonials do ([docs/13](13-media-library.md#testimonial-images-a-fix)).
 
 ## Checklist: add a new resource
 

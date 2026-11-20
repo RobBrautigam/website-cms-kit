@@ -73,7 +73,7 @@ Then wire it into your own Next.js and Supabase project with the [runbook in doc
 - **Search and AI ready (1.6.0).** One site address (`NEXT_PUBLIC_SITE_URL`, required in production) behind every canonical, share card, schema id and sitemap entry; Organization, WebSite, BlogPosting and BreadcrumbList schema; `/sitemap.xml`, `/robots.txt` and `/llms.txt` from one list of public pages and the live posts; a noindex switch for staging; a launch checklist. A live post whose address changes gets a permanent redirect from the old one, written by the database with no chains, and the redirect manager refuses loops and lists every chain. See [docs/14](docs/14-seo-and-redirects.md).
 - **Everyday comforts (1.3.0).** Server autosave with an unsaved-changes warning, required alt text, a dark theme in the admin, bulk publish, unpublish and delete on the posts list, and a search and share-card preview for every post. Since 1.7.0 the preview has content checks beside it: one H1, no skipped heading levels, descriptive link text, alt text on every image and a clean slug.
 - **A repeatable CMS resource pattern.** Index, create, edit, server actions and RLS, shown with four real resources: blog posts (TipTap rich-text editor, autosave, draft, scheduled and published states, optional AI drafting), jobs, testimonials, and a URL redirect manager.
-- **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system you re-theme in one file, and Supabase Storage image upload guarded by Storage RLS.
+- **An accessible admin shell.** Responsive sidebar and drawer, focus-trapped modals, optimistic toggles, a neutral design-token system kept in one file (some status and surface colors are still raw Tailwind classes), and Supabase Storage image upload guarded by Storage RLS.
 - **Six SQL migrations** that stand the whole thing up on a fresh Supabase project: the consolidated schema with its image bucket, staging and approval, hardening, revisions and scheduling, the media library, then the redirects for renamed posts. All six are tested on an in-memory Postgres, no Supabase project needed.
 
 ## How a request is checked
@@ -180,7 +180,7 @@ website-cms-kit/
 - Supabase: Postgres, Auth and Storage, through `@supabase/ssr` 0.10 or later
 - Tailwind CSS v4
 - TipTap 3 (rich text)
-- zod (also the AI routes' output schemas), react-hook-form, sonner, lucide-react, bcryptjs, server-only
+- zod (also the AI routes' output schemas), sonner, lucide-react, bcryptjs, server-only
 - Optional: `@anthropic-ai/sdk` for AI drafting
 - Tests: Node's built-in test runner and PGlite 0.5.8 (Postgres 18 in WebAssembly)
 

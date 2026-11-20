@@ -16,14 +16,14 @@ All three are idempotent. 002 replaces `publish_staged_posts()` from 001 and tig
 
 | Header | Value |
 |---|---|
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` |
+| `Strict-Transport-Security` | `max-age=63072000` (with `HSTS_PRELOAD=1`: `max-age=63072000; includeSubDomains; preload`) |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `X-Frame-Options` | `DENY` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), browsing-topics=()` |
 | `Cross-Origin-Opener-Policy` | `same-origin` |
 
-It also turns off the `X-Powered-By` header. Merge it into your own `next.config.ts` if you have one. Only send HSTS once HTTPS works everywhere on the domain, subdomains included, or drop `includeSubDomains` and `preload`.
+It also turns off the `X-Powered-By` header. Merge it into your own `next.config.ts` if you have one. Only set `HSTS_PRELOAD=1`, which adds `includeSubDomains` and `preload`, once HTTPS works everywhere on the domain, subdomains included ([docs/09](09-environment-and-deploy.md#hsts-and-the-preload-list)).
 
 **The Content Security Policy** carries a fresh nonce on every request, so `proxy.ts` sets it (`lib/security/csp.ts`), not the config. Next.js reads the nonce from the policy header on the request and stamps it on its own scripts; a server component of yours can read it from `headers().get('x-nonce')`. Checked on 2026-10-08 against Next.js 16's request-header parsing, which accepts the nonce from `Content-Security-Policy` or `Content-Security-Policy-Report-Only`.
 
@@ -84,7 +84,7 @@ Migration section 17, `blog_posts_two_person_lock()`, behind the same switch as 
 - a live or scheduled post can be taken down (back to draft) or deleted;
 - any other change to a live or scheduled post, and any change that makes a post live or scheduled, must carry exactly the content of an approved staged change for that post. `publish_staged_posts()` is the normal way.
 
-The lock covers `blog_posts` only. Image files, `url_redirects`, testimonials, jobs and the other tables stay under ordinary admin rights, so an admin can still replace an image's bytes or point a redirect elsewhere alone; a team that needs those under two-person control must lock them too. The service role and the table owner are not affected (server jobs, migrations). Set `REVIEW_REQUIRED` in `lib/staging/rules.ts` to match, so the screens send every go-live through staging.
+Migration 002's lock covers `blog_posts`. Since 1.4.0, migration 003 puts image files and `url_redirects` inside it too ([docs/12](12-revisions-and-scheduling.md)); testimonials, jobs and the other tables stay under ordinary admin rights, so a team that needs those under two-person control must lock them too. The service role and the table owner are not affected (server jobs, migrations). Set `REVIEW_REQUIRED` in `lib/staging/rules.ts` to match, so the screens send every go-live through staging.
 
 Tests: `hardening.test.mjs` (each path as an admin, the switch off and on).
 
