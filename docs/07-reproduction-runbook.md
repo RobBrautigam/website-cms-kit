@@ -53,15 +53,17 @@ npm test
 
 All tests should pass. The same suite runs against your own changes: if you edit a policy or the trigger, a broken rule shows up as a failing test.
 
-## 4. Check the Storage bucket
+## 4. Check the Storage buckets
 
-The migration creates the bucket (section 9 of the SQL file). Open Supabase -> Storage and confirm it reads:
+Migration 000 creates the public bucket (section 9 of the SQL file). Open Supabase -> Storage and confirm it reads:
 - Name: `blog-images`
 - Public: ON
 - File size limit: 5 MB
 - Allowed MIME types: `image/jpeg, image/png, image/webp, image/gif`
 
 And under Storage -> Policies, four `blog_images_admin_*` policies on `objects`. If you create the bucket by hand instead, you still need those policies: without them every upload is refused.
+
+Migration 002 (section 18) creates the private bucket every upload in the admin goes to (the editor, the media library, testimonials). Confirm `blog-images-staged` with Public OFF and the same size limit and types, and its four `blog_images_staged_admin_*` policies. Without that bucket every upload fails, since nothing uploads to the public bucket directly: the kit copies an image there when its post or testimonial makes it public ([docs/11](11-hardening-and-everyday-comforts.md#staged-images-stay-private-until-publish)).
 
 ## 5. Configure Supabase Auth
 

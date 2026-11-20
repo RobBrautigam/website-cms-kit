@@ -74,7 +74,7 @@ select cron.schedule('cms-kit-scheduled-publishing', '* * * * *', $$
 $$);
 ```
 
-Re-running migration 003 schedules the database-only job again under the same name, so run the block above after any re-run of 003. A host cron works the same way: `curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-domain.com/api/cron/scheduled-publishing`.
+Re-running migration 003 schedules the database-only job again under the same name, so after any re-run of 003 run the block's `cron.unschedule` and `cron.schedule` statements again. Leave out the `vault.create_secret` line: the secret is still stored, and Vault refuses a second secret of the same name. A host cron works the same way: `curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-domain.com/api/cron/scheduled-publishing`.
 
 The route checks the secret before it touches anything (503 when `CRON_SECRET` is missing or shorter than 32 characters, 401 for a wrong one, compared in constant time), reads no cookie and needs no session; the route scan in `request-origin.test.mjs` keeps it that way.
 

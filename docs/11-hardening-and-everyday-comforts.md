@@ -100,9 +100,9 @@ Migration section 18 and `lib/staging/`. The editor uploads to a private bucket,
 
 - the admin shows a not-yet-public image through `/api/admin/staged-image`, which re-checks the admin and redirects to a five-minute signed link;
 - the whole-site preview signs staged images for ten minutes;
-- every way a post goes live (Publish now, the Staging page, the posts list, a direct save as published or scheduled, bulk publish) first copies its staged images to the public `blog-images` bucket and removes the staged copies (`promoteImages()`); a copy that fails stops the publish with a message.
+- every way a post goes live (Publish now, the Staging page, the posts list, a direct save as published or scheduled, bulk publish) copies its staged images to the public `blog-images` bucket and removes the staged copies (`promoteImages()`). Since 1.4.0 the copy runs right after the post's own write succeeds (1.3.0 copied first), so a copy that fails no longer stops the publish: the post is saved, the admin is told, and the editor's **Make images public** button tries again. With `SCHEDULED_IMAGES=at_publish`, a scheduled post's images wait for its date instead ([docs/13](13-media-library.md#the-images-of-a-scheduled-post)).
 
-Two known gaps: a staged image whose post is never published stays in the private bucket (clean it up on a schedule), and images promoted for a publish that then fails stay public.
+One known gap: a staged image whose post is never published stays in the private bucket until a super admin runs the staged-image cleanup in Settings, which removes only images nothing uses that are over 48 hours old ([docs/13](13-media-library.md#the-rules)). The second gap 1.3.0 had, images made public for a publish that then failed, closed in 1.4.0 when the copy moved after the write; the scheduled-images job's two minutes of lead time leave the one window [docs/13](13-media-library.md#the-images-of-a-scheduled-post) describes.
 
 Tests: `images.test.mjs`, the promotion cases in `routes.test.mjs`, and the bucket policies in `hardening.test.mjs`.
 

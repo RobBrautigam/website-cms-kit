@@ -177,7 +177,7 @@ website-cms-kit/
 ## Tech stack
 
 - Next.js 16 (App Router) and TypeScript
-- Supabase: Postgres, Auth and Storage, through `@supabase/ssr` 0.10 or later
+- Supabase: Postgres, Auth and Storage, through `@supabase/ssr` 0.12 (the runbook installs `^0.12`; the kit is type-checked against 0.12.7)
 - Tailwind CSS v4
 - TipTap 3 (rich text)
 - zod (also the AI routes' output schemas), sonner, lucide-react, bcryptjs, server-only
