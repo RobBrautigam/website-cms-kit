@@ -11,7 +11,7 @@
 | **Private** | In the private `blog-images-staged` bucket only: uploaded, and no post using it has gone live yet. |
 | **Public** | In the public `blog-images` bucket with a row in the promotion ledger (`blog_image_promotions`): the kit made it public when its post went live, on the date shown. |
 | **Not promoted by the kit** | In the public bucket with no ledger row: uploaded before 1.3.0 straight to the public bucket, or written there by something other than the kit. The kit keeps serving it where content already uses it and never adopts it into a new publish. |
-| **Leftover staged copy** | A public image whose private copy is still there (its removal failed after the copy); the next promotion of its post removes it. |
+| **Private copy left over** | A public image whose private copy is still there (its removal failed after the copy); the next promotion of its post removes it, and Settings' staged-image cleanup does once nothing uses the image and it is over 48 hours old. |
 
 Each card shows the path, the alt text with a Save button, and **Used by**: every live post, staged change, kept revision and testimonial that names the image, each linked to its edit screen. Filters: All, Private, Public, Unused, Missing alt text. Upload adds an image to the private bucket, the same way the editor does.
 

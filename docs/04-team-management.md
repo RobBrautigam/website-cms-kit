@@ -24,7 +24,7 @@ Soft deactivation sets `user_roles.deactivated_at` (`POST .../deactivate`); reac
 
 ## Recover (operator-initiated password reset)
 
-`POST .../recover` sends a fresh recovery link to a user who is locked out, on behalf of a super-admin. Records `user.recover_password` with the actor override (the super-admin is the actor, the target user is the resource).
+`POST .../recover` sends a fresh recovery link to a user who is locked out, on behalf of a super-admin. Records `user.recover_password` (the super-admin is the actor, from their own session; the target user is the resource).
 
 ## Reading the team list
 

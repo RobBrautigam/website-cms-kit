@@ -73,7 +73,7 @@ So: the public sees only published rows; admins see and mutate everything; a lea
 
 ## The audit log (`source/lib/auth/audit.ts`)
 
-Every sensitive mutation records a row in `admin_audit_log` via `recordAdminAction()`. It captures the actor (user id + email + role), the action (a typed union like `blog_post.publish`, `user.role_change`), the resource, a JSON payload, plus IP and user-agent. It is best-effort (a failed audit insert logs but never breaks the mutation) and uses the service-role client. The `/admin/audit-log` page (super-admin only) renders and filters it and exports CSV.
+Every sensitive mutation records a row in `admin_audit_log` via `recordAdminAction()`. It captures the actor (user id + email; the `actor_role` column is written only when a caller passes a role, and no caller in the kit does yet, so the viewer shows "-"), the action (a typed union like `blog_post.publish`, `user.role_change`), the resource, a JSON payload, plus IP and user-agent. It is best-effort (a failed audit insert logs but never breaks the mutation) and uses the service-role client. The `/admin/audit-log` page (super-admin only) renders and filters it and exports CSV.
 
 To add a new audited action: add the literal to the `AuditAction` union in `source/lib/auth/audit.ts` AND to the action filter on the audit-log view. The union is the single source of truth for what is auditable.
 

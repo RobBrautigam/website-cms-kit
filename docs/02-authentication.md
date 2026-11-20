@@ -6,11 +6,11 @@ How a user becomes (and stays) signed in. Authorization (what a signed-in user m
 
 Auth state lives in HTTP cookies, set and refreshed by `@supabase/ssr`. There is no token in localStorage and no bearer header to manage. Because the session is a cookie, it works across server components, server actions, route handlers, and the proxy uniformly.
 
-The catch with cookie sessions in the App Router is that **only the proxy (middleware) and route handlers can WRITE cookies** - server components can read them but cannot refresh them. So the proxy is responsible for refreshing the session on every request; server components just read the already-fresh cookie.
+The catch with cookie sessions in the App Router is that **only the proxy (middleware), route handlers and server actions can WRITE cookies** - server components can read them but cannot refresh them. So the proxy is responsible for refreshing the session on every request; server components just read the already-fresh cookie.
 
 ## The four client factories (`source/lib/supabase/`)
 
-Each context needs a differently-configured Supabase client. There are exactly four:
+Each context needs a differently-configured Supabase client. There are four factories (three places build their own client instead: the proxy's `updateSession()`, below; the redirect lookup in `lib/redirects/lookup.ts`, on the anon key with no session; and the login form, to set the remember-me cookie age):
 
 | Factory | File | Key | Use it for |
 |---|---|---|---|
