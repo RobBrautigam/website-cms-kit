@@ -1,6 +1,6 @@
 # 10 - Staging and Approval
 
-How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`; edit the function there); the tests are in `source/supabase/tests/`.
+How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`: edit the function in 002, then run 003 and 004 again, because re-running 002 puts back the older lock and image policies they replace); the tests are in `source/supabase/tests/`.
 
 ## The problem it solves
 
@@ -97,7 +97,7 @@ The tests prove the first two with the database itself: as `anon`, selecting the
 
 ## How the rules are tested
 
-`source/supabase/tests/staging.test.mjs` loads a stand-in for Supabase's `auth` and `storage` schemas, then migrations 000, 001 and 002 (002 replaces `publish_staged_posts()` and adds the two-person lock; `SKIP_002=1` leaves it out) into PGlite (real Postgres compiled to WebAssembly, so no Supabase project or network) and switches identity the way the Data API does: a role (`anon` or `authenticated`) plus the request's JWT claims (`sub`, `aal`). Every rule on this page has a test, and every test was first seen failing: once with migration 001 missing, then by breaking each rule in a copy of the migration (removing the anon revoke, the two-factor policy, the not-your-own-approval check, the in-review block, the content reset, `security invoker`, and seventeen more) and confirming at least one test went red for each.
+`source/supabase/tests/staging.test.mjs` loads a stand-in for Supabase's `auth` and `storage` schemas, then migrations 000, 001 and 002 (002 replaces `publish_staged_posts()` and adds the two-person lock; `SKIP_002=1` leaves it out) into PGlite (real Postgres compiled to WebAssembly, so no Supabase project or network) and switches identity the way the Data API does: a role (`anon` or `authenticated`) plus the request's JWT claims (`sub`, `aal`). Every rule on this page has a test, and every test was first seen failing: once with migration 001 missing, then by breaking each rule in a copy of the migration (removing the anon revoke, the two-factor policy, the not-your-own-approval check, the in-review block, the content reset, `security invoker`, and seventeen more) and confirming at least one test went red for each (002 replaces `publish_staged_posts()`, so a break inside that function in a copy of 001 shows only with `SKIP_002=1`).
 
 ## The whole-site preview
 
@@ -142,7 +142,7 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 
 | File | What it is |
 |---|---|
-| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and the first `publish_staged_posts()` (migration 002 replaces it; edit the function there) |
+| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and the first `publish_staged_posts()` (migration 002 replaces it: edit the function in 002, then run 003 and 004 again) |
 | `source/supabase/tests/` | The database tests (RLS, grants, transitions, publishing) on an in-memory Postgres (PGlite), plus a stand-in for the parts of Supabase they need; `npm install && npm test` in that folder runs them and the rules tests |
 | `source/lib/staging/rules.ts` | The same rules for the UI: which buttons to show, which picks can publish, which fields a staged copy may hold, which preview paths and requests are accepted; tested by `rules.test.mjs` |
 | `source/lib/staging/queries.ts` | Server reads for the editor, the posts list and the staging page |
