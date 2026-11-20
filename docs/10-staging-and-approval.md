@@ -1,6 +1,6 @@
 # 10 - Staging and Approval
 
-How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql`; the tests are in `source/supabase/tests/`.
+How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`; edit the function there); the tests are in `source/supabase/tests/`.
 
 ## The problem it solves
 
@@ -97,7 +97,7 @@ The tests prove the first two with the database itself: as `anon`, selecting the
 
 ## How the rules are tested
 
-`source/supabase/tests/staging.test.mjs` loads migrations 000 and 001 into PGlite (real Postgres compiled to WebAssembly, so no Supabase project or network) and switches identity the way the Data API does: a role (`anon` or `authenticated`) plus the request's JWT claims (`sub`, `aal`). Every rule on this page has a test, and every test was first seen failing: once with migration 001 missing, then by breaking each rule in a copy of the migration (removing the anon revoke, the two-factor policy, the not-your-own-approval check, the in-review block, the content reset, `security invoker`, and seventeen more) and confirming at least one test went red for each.
+`source/supabase/tests/staging.test.mjs` loads a stand-in for Supabase's `auth` and `storage` schemas, then migrations 000, 001 and 002 (002 replaces `publish_staged_posts()` and adds the two-person lock; `SKIP_002=1` leaves it out) into PGlite (real Postgres compiled to WebAssembly, so no Supabase project or network) and switches identity the way the Data API does: a role (`anon` or `authenticated`) plus the request's JWT claims (`sub`, `aal`). Every rule on this page has a test, and every test was first seen failing: once with migration 001 missing, then by breaking each rule in a copy of the migration (removing the anon revoke, the two-factor policy, the not-your-own-approval check, the in-review block, the content reset, `security invoker`, and seventeen more) and confirming at least one test went red for each.
 
 ## The whole-site preview
 
@@ -142,7 +142,7 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 
 | File | What it is |
 |---|---|
-| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and `publish_staged_posts()` |
+| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and the first `publish_staged_posts()` (migration 002 replaces it; edit the function there) |
 | `source/supabase/tests/` | The database tests (RLS, grants, transitions, publishing) on an in-memory Postgres (PGlite), plus a stand-in for the parts of Supabase they need; `npm install && npm test` in that folder runs them and the rules tests |
 | `source/lib/staging/rules.ts` | The same rules for the UI: which buttons to show, which picks can publish, which fields a staged copy may hold, which preview paths and requests are accepted; tested by `rules.test.mjs` |
 | `source/lib/staging/queries.ts` | Server reads for the editor, the posts list and the staging page |
@@ -155,8 +155,8 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 
 - **Posts only.** Jobs, testimonials and redirects still save live. The same table, trigger and function shape applies to each; copy the posts block.
 - **One staged copy per post.** Two people editing the same live post edit the same staged copy, the way Sanity keeps one draft per document. Saving resets any approval, so nobody publishes content that changed after it was approved.
-- **No history of staged versions.** Publishing deletes the staged row; the audit log keeps who did what, not the old text. Revisions (every save kept, compare, restore) is the next feature and builds on this table.
+- **No history of staged versions.** Publishing deletes the staged row; the audit log keeps who did what, not the old text. Since 1.4.0, revisions keep each saved version of a live or scheduled post in their own table, `blog_post_revisions`, with a restore that goes through staging ([docs/12](12-revisions-and-scheduling.md)).
 - **Scheduled posts are separate.** A scheduled post goes live by its own date; staging does not schedule. Publishing a scheduled post's staged copy updates the content it will go live with and keeps its status and date. Since 1.4.0 the editor sends a scheduled post's edits to its staged copy, like a live post's, so the lock no longer blocks editing it ([docs/12](12-revisions-and-scheduling.md)).
-- **Images are public by URL from upload.** Staged text is private, but an image uploaded while editing a staged change goes to the public `blog-images` bucket at once. Its random name keeps it unguessable, not access-controlled.
-- **A slug swap needs two steps.** Publishing two staged changes that swap slugs in one batch fails on the unique slug. Publish one under a temporary slug first.
+- **Images stay private until their post is published or scheduled.** Since 1.3.0 an image uploaded while editing a staged change waits in the private `blog-images-staged` bucket, and publishing or scheduling the post copies it to the public `blog-images` bucket ([docs/11](11-hardening-and-everyday-comforts.md#staged-images-stay-private-until-publish)); with `SCHEDULED_IMAGES=at_publish` a scheduled post's images wait for its date ([docs/13](13-media-library.md#the-images-of-a-scheduled-post)).
+- **A slug swap publishes in one batch.** Since 1.3.0, `publish_staged_posts()` checks the unique slug at the end of its batch, so two staged changes that swap slugs publish together; a real duplicate still fails the whole batch ([docs/11](11-hardening-and-everyday-comforts.md#slug-swaps-publish-in-one-batch)).
 - **A change in review can be withdrawn by any admin.** "A change in review cannot be published" holds while it stays in review; withdrawing the request (Staging page) makes it publishable again, and the audit log records who withdrew it. Changing the content of a change in review also takes it out of review, and the audit log records that as a withdrawal. "Publish now" refuses a change in review.

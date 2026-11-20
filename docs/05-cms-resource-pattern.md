@@ -77,7 +77,7 @@ One `<Resource>Form` component takes optional `initialData`. `new/page.tsx` rend
 - `ToggleButton` - optimistic on/off (publish/draft, active/inactive). Takes a bound server action.
 - `ConfirmDialog` / `ModalShell` - accessible modal with focus trap, escape, backdrop dismiss.
 - `SubmitButton` - disables while the form action is pending (`useFormStatus`).
-- `ImageUploader` - uploads to the `blog-images` Storage bucket, returns the public URL.
+- `ImageUploader` - uploads to the private `blog-images-staged` Storage bucket, returns the public URL the image will have once its post goes live.
 
 ## Checklist: add a new resource
 
