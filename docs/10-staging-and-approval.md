@@ -1,6 +1,6 @@
 # 10 - Staging and Approval
 
-How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`: edit the function in 002, then run 003 and 004 again, because re-running 002 puts back the older lock and image policies they replace); the tests are in `source/supabase/tests/`.
+How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`: edit the function in 002, then run 003 and 004 again, because re-running 002 puts back the older lock and image policies they replace; with `SCHEDULED_IMAGES=at_publish`, also run the Cron block in [docs/13](13-media-library.md#the-images-of-a-scheduled-post) again, because re-running 003 puts back the database-only job); the tests are in `source/supabase/tests/`.
 
 ## The problem it solves
 
@@ -142,7 +142,7 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 
 | File | What it is |
 |---|---|
-| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and the first `publish_staged_posts()` (migration 002 replaces it: edit the function in 002, then run 003 and 004 again) |
+| `source/supabase/migrations/001_staging_and_approval.sql` | The table, its grants, RLS, the two-factor rule, the review trigger and the first `publish_staged_posts()` (migration 002 replaces it: edit the function in 002, then run 003 and 004 again, and with `SCHEDULED_IMAGES=at_publish` the Cron block in [docs/13](13-media-library.md#the-images-of-a-scheduled-post)) |
 | `source/supabase/tests/` | The database tests (RLS, grants, transitions, publishing) on an in-memory Postgres (PGlite), plus a stand-in for the parts of Supabase they need; `npm install && npm test` in that folder runs them and the rules tests |
 | `source/lib/staging/rules.ts` | The same rules for the UI: which buttons to show, which picks can publish, which fields a staged copy may hold, which preview paths and requests are accepted; tested by `rules.test.mjs` |
 | `source/lib/staging/queries.ts` | Server reads for the editor, the posts list and the staging page |
