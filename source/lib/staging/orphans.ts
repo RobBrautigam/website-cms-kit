@@ -4,11 +4,13 @@
  * An upload lands in the private staged bucket the moment it is picked, so an
  * image removed from a post before it went live, or a post deleted while it
  * waited, leaves its file behind. Settings has a "Clean up staged images"
- * button for the super admin (lib/admin/staging-actions.ts
- * cleanupStagedImages): it lists the staged bucket, keeps every path any post
- * or staged copy still holds, and removes the rest once they are older than
- * the grace period, so an image picked in an editor that has not saved yet is
- * never taken.
+ * button for the super admin (cleanupStagedImages in
+ * app/(admin)/admin/staging/actions.ts): it lists the staged bucket, keeps
+ * every path a post, staged copy, kept revision or testimonial still holds,
+ * and removes the rest once they are older than the grace period (so an image
+ * picked in an editor that has not saved yet is never taken) and the
+ * database's in-use check says nothing uses them (a failed check keeps the
+ * file). This file holds the age and path rule; the action does the reads.
  */
 
 import { isImagePath } from './images'

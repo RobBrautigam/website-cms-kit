@@ -80,10 +80,11 @@ export interface RecordAdminActionInput {
   resource_id?: string;
   payload?: Record<string, unknown>;
   /**
-   * Override the actor. Used in the break-glass operator script and other
-   * server-side flows where the session lookup wouldn't return the right
-   * user (e.g., user.recover_password initiated by an admin against another
-   * user's account).
+   * Override the actor, for a server-side flow with no signed-in session to
+   * look up (a script or a job of your own). No route or action in the kit
+   * passes one: without it the session's user is the actor, which is right
+   * for user.recover_password too (the super admin acts, the target user is
+   * the resource).
    */
   actor_user_id?: string;
   actor_email?: string;

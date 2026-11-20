@@ -3,8 +3,11 @@
  *
  * The admin components reference SEMANTIC token classes (bg-bg-card,
  * text-text-primary, text-accent, border-border, btn-primary, ...) rather than
- * raw colors. That is deliberate: swap the palette in ONE place (the :root block
- * below) and the whole admin surface re-themes. This is the design-token pattern
+ * raw colors, mostly. That is deliberate: the light palette lives in ONE place
+ * (the :root block below). A full re-theme also edits section 1b: the dark and
+ * system blocks, and the dark overrides for the status and surface colors some
+ * components still write as raw Tailwind classes (bg-white, text-red-600,
+ * text-amber-700 and others). This is the design-token pattern
  * Linear/Stripe/Vercel use.
  *
  * The palette here is a NEUTRAL slate + blue. Replace the values in :root with
@@ -18,7 +21,7 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
- * 1. Raw token values (the ONE place to edit for re-theming).
+ * 1. Raw token values: the light palette (a full re-theme also edits 1b).
  * ------------------------------------------------------------------------- */
 :root {
   /* Surfaces */

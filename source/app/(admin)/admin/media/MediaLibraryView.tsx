@@ -181,7 +181,7 @@ export default function MediaLibraryView({ assets, reviewRequired }: { assets: M
                       {badge.label}
                     </span>
                     {a.leftoverStagedCopy && (
-                      <span className="px-2 py-0.5 rounded-full bg-bg-card text-text-secondary" title="A promotion left its private copy behind; the next promotion or the cleanup removes it">
+                      <span className="px-2 py-0.5 rounded-full bg-bg-card text-text-secondary" title="A promotion left its private copy behind; the next promotion of its post removes it, or the staged-image cleanup in Settings once nothing uses the image and it is over 48 hours old">
                         Private copy left over
                       </span>
                     )}
