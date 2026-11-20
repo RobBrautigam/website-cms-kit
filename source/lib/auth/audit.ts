@@ -80,11 +80,12 @@ export interface RecordAdminActionInput {
   resource_id?: string;
   payload?: Record<string, unknown>;
   /**
-   * Override the actor, for a server-side flow with no signed-in session to
-   * look up (a script or a job of your own). No route or action in the kit
-   * passes one: without it the session's user is the actor, which is right
-   * for user.recover_password too (the super admin acts, the target user is
-   * the resource).
+   * Override the actor, for server code that runs inside a Next.js request
+   * with no signed-in user (a cron route of your own, say). This function
+   * reads the request's headers, so it cannot run in a standalone script.
+   * No route or action in the kit passes one: without it the session's user
+   * is the actor, which is right for user.recover_password too (the super
+   * admin acts, the target user is the resource).
    */
   actor_user_id?: string;
   actor_email?: string;

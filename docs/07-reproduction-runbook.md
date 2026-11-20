@@ -61,7 +61,7 @@ Migration 000 creates the public bucket (section 9 of the SQL file). Open Supaba
 - File size limit: 5 MB
 - Allowed MIME types: `image/jpeg, image/png, image/webp, image/gif`
 
-And under Storage -> Policies, four `blog_images_admin_*` policies on `objects`. If you create the bucket by hand instead, you still need those policies: without them every upload is refused.
+And under Storage -> Policies, four `blog_images_admin_*` policies on `objects`. If you create the bucket by hand instead, you still need those policies: without them no admin can delete an unused public image from the media library (the kit's own copies into this bucket run on the service role).
 
 Migration 002 (section 18) creates the private bucket every upload in the admin goes to (the editor, the media library, testimonials). Confirm `blog-images-staged` with Public OFF and the same size limit and types, and its four `blog_images_staged_admin_*` policies. Without that bucket every upload fails, since nothing uploads to the public bucket directly: the kit copies an image there when its post or testimonial makes it public ([docs/11](11-hardening-and-everyday-comforts.md#staged-images-stay-private-until-publish)).
 
