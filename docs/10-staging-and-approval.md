@@ -1,6 +1,6 @@
 # 10 - Staging and Approval
 
-How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`: edit the function in 002, then run 003 and 004 again, because re-running 002 puts back the older lock and image policies they replace; with `SCHEDULED_IMAGES=at_publish`, also run the `cron.unschedule` and `cron.schedule` statements of the Cron block in [docs/13](13-media-library.md#the-images-of-a-scheduled-post) again, because re-running 003 puts back the database-only job (leave out its `vault.create_secret` line: the secret is still stored, and Vault refuses a second secret of the same name)); the tests are in `source/supabase/tests/`.
+How an edit waits beside the live post until someone publishes it, who may move it along, how the whole site is previewed with every staged change, and what the audit log records. The SQL is `source/supabase/migrations/001_staging_and_approval.sql` (migration 002 replaces its `publish_staged_posts()`: edit the function in 002, then run 003 and 004 again, because re-running 002 puts back the older lock and image policies they replace; with `SCHEDULED_IMAGES=at_publish`, also run the `cron.unschedule` and `cron.schedule` statements of the Cron block in [docs/13](13-media-library.md#the-images-of-a-scheduled-post) again, because re-running 003 puts back the database-only job (leave out the block's `vault.create_secret` line: the secret is still stored, and Vault refuses a second secret of the same name)); the tests are in `source/supabase/tests/`.
 
 ## The problem it solves
 
@@ -151,7 +151,7 @@ The review columns on the staged row (`staged_by`, `review_requested_by`, `appro
 | `source/app/api/admin/preview/` | Turn draft mode on (admin only, on-site paths only) and off |
 | `source/components/admin/PostForm.tsx`, `PostsTable.tsx` | "Stage changes" and "Publish now" in the editor, the Staged badge on the list |
 
-## Limits, on purpose
+## Limits and edge cases
 
 - **Posts only.** Jobs, testimonials and redirects still save live. The same table, trigger and function shape applies to each; copy the posts block.
 - **One staged copy per post.** Two people editing the same live post edit the same staged copy, the way Sanity keeps one draft per document. Saving resets any approval, so nobody publishes content that changed after it was approved.

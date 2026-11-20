@@ -80,10 +80,12 @@ export interface RecordAdminActionInput {
   resource_id?: string;
   payload?: Record<string, unknown>;
   /**
-   * Override the actor. Used in the break-glass operator script and other
-   * server-side flows where the session lookup wouldn't return the right
-   * user (e.g., user.recover_password initiated by an admin against another
-   * user's account).
+   * Override the actor, for server code that runs inside a Next.js request
+   * with no signed-in user (a cron route of your own, say). This function
+   * reads the request's headers, so it cannot run in a standalone script.
+   * No route or action in the kit passes one: without it the session's user
+   * is the actor, which is right for user.recover_password too (the super
+   * admin acts, the target user is the resource).
    */
   actor_user_id?: string;
   actor_email?: string;
